@@ -93,3 +93,9 @@ export interface AuditLog {
   request_id: string | null;
   created_at: string;
 }
+
+export interface AuthStatus {
+  bootstrap_required: boolean;
+  setup_code_required: boolean;
+  web_bootstrap_enabled: boolean;
+}

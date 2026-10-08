@@ -1,9 +1,11 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.middleware import request_context
 from app.api.routes import agents, audit, auth, health
@@ -46,7 +48,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     for router in (health.router, auth.router, agents.router, audit.router):
         app.include_router(router, prefix=settings.api_prefix)
+    if settings.static_dir:
+        _serve_frontend(app, Path(settings.static_dir), settings.api_prefix)
     return app
+
+
+def _serve_frontend(app: FastAPI, root: Path, api_prefix: str) -> None:
+    """Serve the built SPA: real files as-is, every other non-API path gets index.html."""
+    root = root.resolve()
+    index = root / "index.html"
+    if not index.is_file():
+        raise RuntimeError(f"MATT_STATIC_DIR has no index.html: {root}")
+    app.mount("/assets", StaticFiles(directory=root / "assets"), name="assets")
+
+    @app.api_route("/{path:path}", methods=["GET", "HEAD"], include_in_schema=False)
+    async def spa(path: str) -> FileResponse:
+        if path.startswith(api_prefix.strip("/") + "/"):
+            raise HTTPException(status.HTTP_404_NOT_FOUND)
+        candidate = (root / path).resolve()
+        if path and candidate.is_relative_to(root) and candidate.is_file():
+            return FileResponse(candidate)
+        return FileResponse(index)
 
 
 app = create_app()

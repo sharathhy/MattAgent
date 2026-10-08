@@ -1,5 +1,6 @@
 import type {
   AgentDetail,
+  AuthStatus,
   AgentSummary,
   AuditLog,
   Health,
@@ -61,8 +62,8 @@ export interface AgentFilters {
 
 export const api = {
   health: () => request<Health>("/health"),
-  authStatus: () => request<{ bootstrap_required: boolean }>("/auth/status"),
-  bootstrap: (body: { email: string; password: string; full_name: string }) =>
+  authStatus: () => request<AuthStatus>("/auth/status"),
+  bootstrap: (body: { email: string; password: string; full_name: string; setup_code?: string }) =>
     post<User>("/auth/bootstrap", body),
   login: (email: string, password: string) =>
     post<{ access_token: string }>("/auth/login", { email, password }),

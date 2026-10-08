@@ -13,6 +13,7 @@ export function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [setupCode, setSetupCode] = useState("");
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
 
@@ -20,7 +21,18 @@ export function LoginPage() {
   if (status.isPending) return <Loading label="Connecting to MATT" />;
   if (status.isError) return <div className="p-8"><ErrorState error={status.error} /></div>;
 
-  const bootstrap = status.data.bootstrap_required;
+  const { bootstrap_required: bootstrap, setup_code_required: needsCode, web_bootstrap_enabled } = status.data;
+
+  if (bootstrap && !web_bootstrap_enabled) {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-4">
+        <div className="panel max-w-sm p-8 text-center text-sm text-muted">
+          No owner account exists yet. Create it on the server with{" "}
+          <code className="font-mono text-accent">matt create-owner --email you@example.com</code>.
+        </div>
+      </div>
+    );
+  }
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -28,7 +40,7 @@ export function LoginPage() {
     setError(null);
     try {
       if (bootstrap) {
-        await api.bootstrap({ email, password, full_name: fullName });
+        await api.bootstrap({ email, password, full_name: fullName, setup_code: needsCode ? setupCode : undefined });
         await qc.invalidateQueries({ queryKey: ["auth-status"] });
       }
       await login(email, password);
@@ -50,6 +62,12 @@ export function LoginPage() {
           <p className="text-xs text-muted">
             No accounts exist yet. The first account becomes the owner, with final authority over every agent.
           </p>
+        )}
+        {bootstrap && needsCode && (
+          <label className="block space-y-1 text-sm">
+            <span className="label">Setup code</span>
+            <input className="input" type="password" required autoComplete="off" value={setupCode} onChange={(e) => setSetupCode(e.target.value)} />
+          </label>
         )}
         {bootstrap && (
           <label className="block space-y-1 text-sm">

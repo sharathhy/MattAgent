@@ -1,0 +1,27 @@
+# One-click deploy on Render's free tier: https://render.com/deploy?repo=https://github.com/sharathhy/MattAgent
+# You will be asked for MATT_BOOTSTRAP_TOKEN: pick a private setup code. The first person to
+# enter it on the sign-in page becomes the owner, so keep it secret until you have done that.
+services:
+  - type: web
+    name: matt
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: MATT_ENV
+        value: production
+      - key: MATT_DATABASE_URL
+        fromDatabase:
+          name: matt-db
+          property: connectionString
+      - key: MATT_SECRET_KEY
+        generateValue: true
+      - key: MATT_BOOTSTRAP_TOKEN
+        sync: false
+
+databases:
+  - name: matt-db
+    plan: free
+    databaseName: matt
+    user: matt

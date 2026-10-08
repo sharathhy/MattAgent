@@ -4,12 +4,16 @@ from tests.conftest import OWNER, login
 
 
 def test_bootstrap_only_once(client: TestClient) -> None:
-    assert client.get("/api/auth/status").json() == {"bootstrap_required": True}
+    assert client.get("/api/auth/status").json() == {
+        "bootstrap_required": True,
+        "setup_code_required": False,
+        "web_bootstrap_enabled": True,
+    }
     r = client.post("/api/auth/bootstrap", json=OWNER)
     assert r.status_code == 201
     assert r.json()["role"] == "owner"
     assert "password" not in r.text
-    assert client.get("/api/auth/status").json() == {"bootstrap_required": False}
+    assert client.get("/api/auth/status").json()["bootstrap_required"] is False
     again = client.post("/api/auth/bootstrap", json={**OWNER, "email": "other@example.com"})
     assert again.status_code == 409
 

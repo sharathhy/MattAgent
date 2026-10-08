@@ -3,7 +3,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _INSECURE_DEFAULT_SECRET = "dev-insecure-secret-change-me-before-deploying"  # noqa: S105
@@ -25,8 +25,23 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     log_json: bool = True
 
+    #: Setup code required to create the owner account through the web UI. In production the web
+    #: bootstrap is disabled unless this is set; ``matt create-owner`` always works.
+    bootstrap_token: str | None = None
+    #: Built frontend to serve from the API process (single-service deployments).
+    static_dir: str | None = None
+
     login_rate_limit: int = Field(default=10, ge=1, description="Login attempts per window")
     login_rate_window_seconds: int = Field(default=60, ge=1)
+
+    @field_validator("database_url")
+    @classmethod
+    def _use_psycopg_driver(cls, url: str) -> str:
+        """Hosting providers hand out ``postgres://`` URLs; SQLAlchemy needs an explicit driver."""
+        for prefix in ("postgres://", "postgresql://"):
+            if url.startswith(prefix):
+                return "postgresql+psycopg://" + url.removeprefix(prefix)
+        return url
 
     @model_validator(mode="after")
     def _check_production(self) -> "Settings":
@@ -37,6 +52,8 @@ class Settings(BaseSettings):
                 )
             if self.database_url.startswith("sqlite"):
                 raise ValueError("Use PostgreSQL (MATT_DATABASE_URL) in production")
+            if self.bootstrap_token is not None and len(self.bootstrap_token) < 8:
+                raise ValueError("MATT_BOOTSTRAP_TOKEN must be at least 8 characters")
         return self
 
 

@@ -1,8 +1,10 @@
+import secrets
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app.api.deps import AppSettings, CurrentUser, DbSession, require_role
+from app.core.config import Settings
 from app.core.domain import Role
 from app.core.rate_limit import RateLimiter
 from app.core.security import create_access_token
@@ -26,13 +28,40 @@ def _login_limiter(request: Request) -> RateLimiter:
     return limiter
 
 
+def _web_bootstrap_enabled(settings: Settings) -> bool:
+    return settings.bootstrap_token is not None or settings.env != "production"
+
+
 @router.get("/status", response_model=AuthStatus)
-def auth_status(db: DbSession) -> AuthStatus:
-    return AuthStatus(bootstrap_required=user_repo.count(db) == 0)
+def auth_status(db: DbSession, settings: AppSettings) -> AuthStatus:
+    return AuthStatus(
+        bootstrap_required=user_repo.count(db) == 0,
+        setup_code_required=settings.bootstrap_token is not None,
+        web_bootstrap_enabled=_web_bootstrap_enabled(settings),
+    )
 
 
 @router.post("/bootstrap", response_model=UserOut, status_code=status.HTTP_201_CREATED)
-def bootstrap(body: BootstrapRequest, db: DbSession) -> User:
+def bootstrap(
+    body: BootstrapRequest,
+    request: Request,
+    db: DbSession,
+    settings: AppSettings,
+    limiter: Annotated[RateLimiter, Depends(_login_limiter)],
+) -> User:
+    """Create the owner. On a public deployment a setup code stops strangers claiming it."""
+    client = request.client.host if request.client else "unknown"
+    if not limiter.allow(f"bootstrap:{client}"):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "Too many attempts; try later")
+    if not _web_bootstrap_enabled(settings):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, "Create the owner with the 'matt create-owner' command"
+        )
+    expected = settings.bootstrap_token
+    if expected is not None and not secrets.compare_digest(
+        (body.setup_code or "").encode(), expected.encode()
+    ):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Invalid setup code")
     return auth_service.bootstrap_owner(
         db, email=body.email, password=body.password, full_name=body.full_name
     )

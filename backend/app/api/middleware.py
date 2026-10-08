@@ -16,9 +16,14 @@ SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
     "Referrer-Policy": "no-referrer",
-    "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
     "Permissions-Policy": "camera=(), geolocation=()",
 }
+API_CSP = "default-src 'none'; frame-ancestors 'none'"
+#: For the web app when the API process also serves it (single-service deployments).
+WEB_CSP = (
+    "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
+    "connect-src 'self'; frame-ancestors 'none'"
+)
 
 
 async def request_context(
@@ -42,6 +47,10 @@ async def request_context(
         },
     )  # fmt: skip
     response.headers["X-Request-ID"] = rid
-    if not request.url.path.startswith(("/docs", "/redoc")):
+    path = request.url.path
+    if not path.startswith(("/docs", "/redoc", "/openapi.json")):
         response.headers.update(SECURITY_HEADERS)
+        response.headers["Content-Security-Policy"] = (
+            API_CSP if path.startswith("/api") else WEB_CSP
+        )
     return response

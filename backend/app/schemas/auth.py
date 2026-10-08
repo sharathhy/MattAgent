@@ -3,10 +3,14 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from app.core.domain import Role
 
 
-class BootstrapRequest(BaseModel):
+class NewUser(BaseModel):
     email: EmailStr
     password: str = Field(min_length=12, max_length=128)
     full_name: str = Field(default="", max_length=200)
+
+
+class BootstrapRequest(NewUser):
+    setup_code: str | None = Field(default=None, max_length=200)
 
 
 class LoginRequest(BaseModel):
@@ -14,7 +18,7 @@ class LoginRequest(BaseModel):
     password: str = Field(max_length=128)
 
 
-class CreateUserRequest(BootstrapRequest):
+class CreateUserRequest(NewUser):
     role: Role = Role.VIEWER
 
 
@@ -36,3 +40,7 @@ class UserOut(BaseModel):
 
 class AuthStatus(BaseModel):
     bootstrap_required: bool
+    #: True when the web bootstrap needs a setup code; False when it is open (development).
+    setup_code_required: bool
+    #: False when the owner must be created with the ``matt create-owner`` command instead.
+    web_bootstrap_enabled: bool

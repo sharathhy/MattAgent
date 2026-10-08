@@ -27,15 +27,22 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe("authentication", () => {
   it("offers owner bootstrap on a fresh install", async () => {
-    mockApi({ "/auth/status": { bootstrap_required: true } });
+    mockApi({ "/auth/status": { bootstrap_required: true, setup_code_required: false, web_bootstrap_enabled: true } });
     renderApp("/command-center");
     expect(await screen.findByText("Initialise owner account")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Create owner and sign in" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Setup code")).not.toBeInTheDocument();
+  });
+
+  it("asks for the setup code on a public deployment", async () => {
+    mockApi({ "/auth/status": { bootstrap_required: true, setup_code_required: true, web_bootstrap_enabled: true } });
+    renderApp("/login");
+    expect(await screen.findByLabelText("Setup code")).toBeRequired();
   });
 
   it("signs in and lands on the command center", async () => {
     mockApi({
-      "/auth/status": { bootstrap_required: false },
+      "/auth/status": { bootstrap_required: false, setup_code_required: false, web_bootstrap_enabled: true },
       "/auth/login": { access_token: "tok" },
       "/auth/me": OWNER,
       "/agents/summary": SUMMARY,
@@ -53,7 +60,7 @@ describe("authentication", () => {
     tokenStore.set("expired");
     mockApi({
       "/auth/me": () => ({ status: 401, body: { detail: "Not authenticated" } }),
-      "/auth/status": { bootstrap_required: false },
+      "/auth/status": { bootstrap_required: false, setup_code_required: false, web_bootstrap_enabled: true },
     });
     renderApp("/command-center");
     expect(await screen.findByRole("button", { name: "Sign in" })).toBeInTheDocument();

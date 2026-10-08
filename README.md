@@ -45,6 +45,11 @@ npm run dev                       # http://localhost:5173, proxies /api to :8000
 Open http://localhost:5173. On first run you create the owner account (or run
 `uv run matt create-owner --email you@example.com`). API docs are at http://localhost:8000/docs.
 
+## Deploy
+
+One click on Render's free tier with `render.yaml`, or Docker Compose on any VM. See
+[deployment](docs/deployment.md).
+
 ## Checks
 
 ```bash
