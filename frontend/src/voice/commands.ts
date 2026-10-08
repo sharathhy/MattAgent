@@ -1,5 +1,4 @@
 import { api } from "../api/client";
-import { inr } from "../components/kit";
 import { titleCase } from "../lib/format";
 import { NAV } from "../lib/navigation";
 
@@ -91,23 +90,6 @@ export async function runCommand(raw: string, ctx: CommandContext): Promise<Comm
     }
   }
 
-  if (
-    t.length < 90 &&
-    /\b(how much|what(?:'s| is| are| did)?|today'?s|show|tell me|brief)\b.*\b(revenue|earn\w*|income|profit|money|made)\b/.test(t)
-  ) {
-    const d = await api.dashboard();
-    const r = d.revenue;
-    const skills = r.earning_skills ?? [];
-    const today = r.today_inr === undefined ? "" : `Today you've earned ${inr(r.today_inr)}. `;
-    const top = skills.length
-      ? ` Earning skills: ${list(skills.slice(0, 3).map((s) => `${s.name} with ${inr(s.revenue_inr)}`))}.`
-      : " No skill has earned money yet.";
-    return {
-      say: `${today}This month: ${inr(r.month_inr)} revenue and ${inr(r.profit_month_inr)} profit. All time: ${inr(r.total_inr)}.${top}`,
-      navigate: has(t, "show", "open") ? "/revenue" : undefined,
-    };
-  }
-
   const agentQuery = /\b(?:tell me about|who is|what is|what does|look ?up|open agent)\s+(?:the\s+)?(.+?)(?:\s+(?:agent|skill|do))?$/i.exec(text);
   if (agentQuery?.[1] && !findPage(agentQuery[1])) {
     const q = agentQuery[1];
@@ -165,7 +147,8 @@ async function askAgents(text: string): Promise<CommandOutcome> {
   const res = await api.command(text);
   // The CEO answers inline; workflows keep running, so MATT reports back when they finish.
   const background = res.task_id !== null && res.intent !== "ceo";
-  return { say: res.reply, navigate: INTENT_PAGE[res.intent], taskId: background ? (res.task_id ?? undefined) : undefined };
+  const page = typeof res.data.navigate === "string" ? res.data.navigate : INTENT_PAGE[res.intent];
+  return { say: res.reply, navigate: page, taskId: background ? (res.task_id ?? undefined) : undefined };
 }
 
 const UNITS: Record<string, number> = { second: 1000, sec: 1000, minute: 60_000, min: 60_000, hour: 3_600_000, hr: 3_600_000 };

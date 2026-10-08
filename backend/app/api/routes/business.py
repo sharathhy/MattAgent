@@ -40,7 +40,7 @@ from app.schemas.business import (
     ProductOut,
 )
 from app.schemas.ops import TaskOut
-from app.services import audit, events, tasks
+from app.services import audit, earnings, tasks
 from app.services.errors import NotFoundError
 from app.services.scoring import opportunity_score
 
@@ -222,14 +222,9 @@ def _crud(
             data["expires_at"] = utcnow() + timedelta(days=days) if days else None
             data["source"] = f"user:{user.id}"
         if model is LedgerEntry:
-            data["recorded_by"] = str(user.id)
+            return earnings.record(db, user, **data)
         row = model(**data)
         _save(db, row, user.id, f"{name}.created", {})
-        if model is LedgerEntry:
-            events.emit(
-                db, "ledger.recorded", kind=data["kind"], amount_inr=str(data["amount_inr"])
-            )
-            db.commit()
         return row
 
     @router.put(f"/{path}/{{item_id}}", response_model=schema_out, name=f"update_{name}")
@@ -238,8 +233,15 @@ def _crud(
         data = body.model_dump()  # type: ignore[attr-defined]
         if model is Knowledge:
             data.pop("retention_days")
+        previous_agent = getattr(row, "agent_slug", None)
+        if model is LedgerEntry:
+            earnings.check_agent(db, data["agent_slug"])
         for key, value in data.items():
             setattr(row, key, value)
+        if model is LedgerEntry:
+            db.flush()
+            earnings.sync_agent_revenue(db, previous_agent)
+            earnings.sync_agent_revenue(db, data["agent_slug"])
         _save(db, row, user.id, f"{name}.updated", {})
         return row
 
@@ -251,6 +253,9 @@ def _crud(
             target_type=name, target_id=str(item_id),
         )  # fmt: skip
         db.delete(row)
+        if model is LedgerEntry:
+            db.flush()
+            earnings.sync_agent_revenue(db, row.agent_slug)  # type: ignore[attr-defined]
         db.commit()
         return Response(status_code=204)
 

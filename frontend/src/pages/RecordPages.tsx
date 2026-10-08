@@ -9,7 +9,8 @@ const REVENUE_CATEGORIES = [
   "subscriptions", "lead_generation", "other",
 ];
 
-const today = () => new Date().toISOString().slice(0, 10);
+/** Local calendar date (the business runs on the browser's local day, IST for the owner). */
+const today = () => new Date().toLocaleDateString("en-CA");
 
 export function CustomersPage() {
   return (
@@ -64,15 +65,32 @@ export function RevenuePage() {
       intro={<>Every amount here is a <Truth value="fact" /> you recorded. MATT never generates revenue figures.</>}
       empty="No revenue or expenses recorded yet."
       summary={(rows) => {
-        const sum = (kind: string) => rows.filter((r) => r.kind === kind).reduce((s, r) => s + Number(r.amount_inr), 0);
+        const sum = (kind: string, day?: string) =>
+          rows.filter((r) => r.kind === kind && (!day || r.occurred_on === day)).reduce((s, r) => s + Number(r.amount_inr), 0);
+        const byAgent = new Map<string, number>();
+        rows.filter((r) => r.kind === "revenue" && r.agent_slug).forEach((r) =>
+          byAgent.set(r.agent_slug ?? "", (byAgent.get(r.agent_slug ?? "") ?? 0) + Number(r.amount_inr)));
         const byCat = new Map<string, number>();
         rows.filter((r) => r.kind === "revenue").forEach((r) => byCat.set(r.category, (byCat.get(r.category) ?? 0) + Number(r.amount_inr)));
         return (
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+            <Stat label="Today" value={inr(sum("revenue", today()))} hint="Revenue recorded today" />
             <Stat label="Revenue" value={inr(sum("revenue"))} hint="All recorded" />
             <Stat label="Expenses" value={inr(sum("expense"))} hint="All recorded" />
             <Stat label="Profit" value={inr(sum("revenue") - sum("expense"))} />
             <Stat label="Top stream" value={[...byCat].sort((a, b) => b[1] - a[1])[0]?.[0]?.replace(/_/g, " ") ?? "—"} />
+          </div>
+          {byAgent.size > 0 && (
+            <div className="panel p-4 text-sm">
+              <div className="label mb-2">Skills earning money</div>
+              <ul className="space-y-1">
+                {[...byAgent].sort((a, b) => b[1] - a[1]).map(([slug, total]) => (
+                  <li key={slug} className="flex justify-between"><span>{slug}</span><span className="font-mono">{inr(total)}</span></li>
+                ))}
+              </ul>
+            </div>
+          )}
           </div>
         );
       }}
@@ -82,14 +100,16 @@ export function RevenuePage() {
         { name: "category", label: "Stream", type: "select", options: REVENUE_CATEGORIES },
         { name: "description", label: "Description", required: true },
         { name: "occurred_on", label: "Date", type: "date", required: true },
+        { name: "agent_slug", label: "Earned by agent (optional)", placeholder: "e.g. sales-copywriter" },
         { name: "recurring", label: "Recurring", type: "checkbox" },
       ]}
-      toBody={(v) => ({ ...v, occurred_on: v.occurred_on || today() })}
+      toBody={(v) => ({ ...v, occurred_on: v.occurred_on || today(), agent_slug: v.agent_slug || null })}
       columns={[
         { label: "Date", render: (r) => r.occurred_on },
         { label: "Type", render: (r) => <Badge value={r.kind === "revenue" ? "won" : "lost"} /> },
         { label: "Description", render: (r) => r.description },
         { label: "Stream", render: (r) => titleCase(r.category) },
+        { label: "Earned by", render: (r) => r.agent_slug ?? "—" },
         { label: "Amount", render: (r) => <span className="font-mono">{inr(r.amount_inr)}{r.recurring ? " ↻" : ""}</span> },
       ]}
     />

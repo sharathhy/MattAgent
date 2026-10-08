@@ -96,16 +96,9 @@ describe("everyday skills", () => {
     expect((await runCommand("open gmail", ctx)).link?.url).toBe("https://mail.google.com");
   });
 
-  it("reports today's revenue and the earning skills", async () => {
-    mockApi({
-      "/dashboard": {
-        revenue: { month_inr: 25000, total_inr: 40000, profit_month_inr: 20000, today_inr: 1500,
-          earning_skills: [{ slug: "s", name: "Website Seller", revenue_inr: 25000, revenue_today_inr: 1500 }] },
-      },
-    });
-    const out = await runCommand("how much did we earn today", ctx);
-    expect(out.say).toContain("Today you've earned ₹1,500");
-    expect(out.say).toContain("Website Seller with ₹25,000");
+  it("lets the backend answer money questions and opens the page it names", async () => {
+    mockApi({ "/command": { reply: "Today you've earned ₹1,500.", intent: "earnings", task_id: null, data: { navigate: "/revenue" } } });
+    expect(await runCommand("how much did we earn today", ctx)).toEqual({ say: "Today you've earned ₹1,500.", navigate: "/revenue", taskId: undefined });
   });
 });
 

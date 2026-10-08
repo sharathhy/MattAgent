@@ -10,6 +10,7 @@ export function RevenuePanel() {
   const dash = useQuery({ queryKey: ["dashboard"], queryFn: api.dashboard, refetchInterval: 5000 });
   const r = dash.data?.revenue;
   const skills = r?.earning_skills ?? [];
+  const daily = dash.data?.earnings?.daily ?? [];
   const loading = !r;
 
   return (
@@ -21,8 +22,9 @@ export function RevenuePanel() {
         <span className="font-mono text-[10px] uppercase tracking-wider text-emerald-300">fact · ledger</span>
       </div>
       <div className="hud-num glow mt-2 text-4xl text-emerald-300" aria-label="Revenue today">
-        {loading ? "…" : r.today_inr === undefined ? "—" : inr(r.today_inr)}
+        {loading ? "…" : inr(r.today_inr)}
       </div>
+      {daily.length > 1 && <Sparkline values={daily.map((d) => d.revenue_inr)} />}
       <div className="mt-3 grid grid-cols-3 gap-2 border-t border-line pt-3 text-center">
         <Mini label="This month" value={loading ? "…" : inr(r.month_inr)} />
         <Mini label="All time" value={loading ? "…" : inr(r.total_inr)} />
@@ -71,5 +73,19 @@ function Mini({ label, value, tone = "text-cyan-100" }: { label: string; value: 
       <div className={`hud-num text-sm ${tone}`}>{value}</div>
       <div className="mt-0.5 text-[10px] uppercase tracking-wider text-muted">{label}</div>
     </div>
+  );
+}
+
+/** Last 30 days of revenue as a glowing line. */
+function Sparkline({ values }: { values: number[] }) {
+  const max = Math.max(...values, 1);
+  const w = 260;
+  const h = 40;
+  const pts = values.map((v, i) => `${(i / (values.length - 1)) * w},${h - 3 - (v / max) * (h - 6)}`).join(" ");
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} className="mt-2 h-10 w-full" role="img" aria-label="Revenue over the last 30 days">
+      <polyline points={`0,${h} ${pts} ${w},${h}`} fill="rgb(52 211 153 / 0.12)" stroke="none" />
+      <polyline points={pts} fill="none" stroke="var(--color-ok)" strokeWidth="1.8" style={{ filter: "drop-shadow(0 0 4px rgb(52 211 153 / 0.8))" }} />
+    </svg>
   );
 }

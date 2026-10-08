@@ -15,9 +15,9 @@ export function LiveMetrics() {
   return (
     <div className="space-y-4">
       <section aria-label="Business metrics" className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-5">
+        <Stat label="Revenue Today" value={v(inr(d?.revenue.today_inr))} hint="Fact · recorded today" />
         <Stat label="Revenue This Month" value={v(inr(d?.revenue.month_inr))} hint="Fact · recorded in Revenue" />
         <Stat label="Profit This Month" value={v(inr(d?.revenue.profit_month_inr))} hint="Fact · revenue minus expenses" />
-        <Stat label="Total Revenue" value={v(inr(d?.revenue.total_inr))} hint={`${d?.revenue.entries ?? 0} ledger entries`} />
         <Stat
           label="Pipeline"
           value={v(d && d.pipeline.pipeline_value_inr.max ? `${inr(d.pipeline.pipeline_value_inr.min)}–${inr(d.pipeline.pipeline_value_inr.max)}` : inr(0))}
@@ -32,7 +32,11 @@ export function LiveMetrics() {
           value={v(inr(d?.ai.spent_today_inr))}
           hint={d ? (d.ai.model_available ? `${d.ai.calls_today} calls · limit ${inr(d.ai.daily_budget_inr)} paid` : "No AI model key set") : ""}
         />
-        <Stat label="Agents Working" value={v(d?.workforce.agents_with_work)} hint={`of ${d?.workforce.agents ?? 0} registered`} />
+        <Stat
+          label="Skills Earning"
+          value={v(d?.revenue.earning_skills.length)}
+          hint={d?.revenue.earning_skills[0] ? `Top: ${d.revenue.earning_skills[0].name}` : "None recorded yet"}
+        />
       </section>
       {d && d.tasks.recent.length > 0 && (
         <section className="panel p-4" aria-label="Recent activity">
