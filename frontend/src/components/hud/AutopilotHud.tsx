@@ -59,7 +59,7 @@ export function AutopilotHud() {
                 : "border-accent/60 bg-accent/10 hover:bg-accent/25"
             }`}
           >
-            {on ? "Disengage" : "Engage"}
+            {on ? "Engaged" : "Engage"}
           </button>
         )}
       </div>
