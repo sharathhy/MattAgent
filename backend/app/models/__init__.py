@@ -23,11 +23,21 @@ from app.models.ops import (
     Tool,
     WorkflowRun,
 )
+from app.models.trading import (
+    BrokerAccount,
+    MarketSnapshot,
+    TradingAccount,
+    TradingBot,
+    TradingInsight,
+    TradingTrade,
+)
 from app.models.user import User
 
 __all__ = [
-    "Agent", "AgentVersion", "Approval", "AuditLog", "Autopilot", "Business", "ChangeRequest",
+    "Agent", "AgentVersion", "Approval", "AuditLog", "Autopilot", "BrokerAccount", "Business",
+    "ChangeRequest",
     "Customer", "Event", "Experiment", "Knowledge", "Lead", "LedgerEntry", "ModelSource",
-    "ModelUsage", "Opportunity", "PaymentRequest", "Product", "ReceivingAccount", "Task", "Tool",
-    "User", "WorkflowRun",
+    "MarketSnapshot", "ModelUsage", "Opportunity", "PaymentRequest", "Product", "ReceivingAccount",
+    "Task", "Tool", "TradingAccount", "TradingBot", "TradingInsight", "TradingTrade", "User",
+    "WorkflowRun",
 ]  # fmt: skip
