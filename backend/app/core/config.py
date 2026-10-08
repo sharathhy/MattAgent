@@ -36,11 +36,39 @@ class Settings(BaseSettings):
     #: Built frontend to serve from the API process (single-service deployments).
     static_dir: str | None = None
 
+    # --- AI model router (free-first). Keys come only from the environment. ---
+    gemini_api_key: str | None = None
+    gemini_model: str = "gemini-2.5-flash"
+    groq_api_key: str | None = None
+    groq_model: str = "llama-3.3-70b-versatile"
+    ollama_url: str | None = None
+    ollama_model: str = "llama3.2"
+    anthropic_api_key: str | None = None
+    anthropic_model: str = "claude-opus-5-5"
+    #: Premium (paid) models are only used when explicitly allowed.
+    allow_premium_models: bool = False
+    #: Spend limits for paid model usage, in INR. MATT stops and asks for approval at the limit.
+    daily_ai_budget_inr: float = Field(default=0, ge=0)
+    monthly_ai_budget_inr: float = Field(default=0, ge=0)
+    usd_to_inr: float = Field(default=84.0, gt=0)
+
+    # --- Background worker ---
+    worker_enabled: bool = True
+    worker_poll_seconds: float = Field(default=1.0, gt=0)
+
     login_rate_limit: int = Field(default=10, ge=1, description="Login attempts per window")
     login_rate_window_seconds: int = Field(default=60, ge=1)
 
     @field_validator(
-        "bootstrap_token", "google_client_id", "owner_email", "static_dir", mode="before"
+        "bootstrap_token",
+        "google_client_id",
+        "owner_email",
+        "static_dir",
+        "gemini_api_key",
+        "groq_api_key",
+        "ollama_url",
+        "anthropic_api_key",
+        mode="before",
     )
     @classmethod
     def _blank_is_unset(cls, value: object) -> object:

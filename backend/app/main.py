@@ -6,14 +6,19 @@ from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy.orm import sessionmaker
 
 from app.api.middleware import request_context
-from app.api.routes import agents, audit, auth, health
+from app.api.routes import agents, audit, auth, business, health, ops
 from app.core.config import Settings, get_settings
 from app.core.google import GoogleTokenVerifier
 from app.core.logging import configure_logging
 from app.core.rate_limit import RateLimiter
+from app.db.session import build_engine
+from app.llm.router import ModelRouter
+from app.services import tools
 from app.services.errors import ServiceError
+from app.worker import Worker
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -22,7 +27,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         configure_logging(settings.log_level, settings.log_json)
-        yield
+        engine = build_engine(settings.database_url)
+        factory = sessionmaker(bind=engine, expire_on_commit=False)
+        with factory() as db:
+            tools.seed_tools(db)
+        worker = None
+        if settings.worker_enabled:
+            worker = Worker(factory, app.state.model_router, settings.worker_poll_seconds)
+            worker.start()
+        try:
+            yield
+        finally:
+            if worker:
+                worker.stop()
+            engine.dispose()
 
     app = FastAPI(
         title="MATT API",
@@ -34,6 +52,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.login_limiter = RateLimiter(
         settings.login_rate_limit, settings.login_rate_window_seconds
     )
+    app.state.model_router = ModelRouter(settings)
     app.state.google_verifier = (
         GoogleTokenVerifier(settings.google_client_id) if settings.google_client_id else None
     )
@@ -50,7 +69,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def _service_error(_: Request, exc: ServiceError) -> JSONResponse:
         return JSONResponse({"detail": exc.message}, status_code=exc.status_code)
 
-    for router in (health.router, auth.router, agents.router, audit.router):
+    for router in (
+        health.router,
+        auth.router,
+        agents.router,
+        audit.router,
+        ops.router,
+        business.router,
+    ):
         app.include_router(router, prefix=settings.api_prefix)
     if settings.static_dir:
         _serve_frontend(app, Path(settings.static_dir), settings.api_prefix)

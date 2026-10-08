@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
@@ -9,6 +9,7 @@ from app.core.config import Settings, get_settings
 from app.core.domain import ROLE_RANK, Role
 from app.core.security import decode_access_token
 from app.db.session import get_db
+from app.llm.router import ModelRouter
 from app.models import User
 
 DbSession = Annotated[Session, Depends(get_db)]
@@ -44,3 +45,13 @@ def require_role(minimum: Role) -> Callable[[User], User]:
         return user
 
     return checker
+
+
+def get_model_router(request: Request) -> ModelRouter:
+    router: ModelRouter = request.app.state.model_router
+    return router
+
+
+Router = Annotated[ModelRouter, Depends(get_model_router)]
+Operator = Annotated[User, Depends(require_role(Role.OPERATOR))]
+Admin = Annotated[User, Depends(require_role(Role.ADMIN))]

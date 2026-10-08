@@ -16,7 +16,12 @@ OWNER = {"email": "owner@example.com", "password": "correct-horse-battery", "ful
 
 @pytest.fixture
 def settings(tmp_path: Path) -> Settings:
-    return Settings(env="test", database_url=f"sqlite:///{tmp_path / 'test.db'}", log_json=False)
+    return Settings(
+        env="test",
+        database_url=f"sqlite:///{tmp_path / 'test.db'}",
+        log_json=False,
+        worker_enabled=False,
+    )
 
 
 @pytest.fixture

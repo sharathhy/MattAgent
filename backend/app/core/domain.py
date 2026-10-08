@@ -77,3 +77,61 @@ class CostTier(StrEnum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
+
+
+class TaskStatus(StrEnum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    WAITING_APPROVAL = "waiting_approval"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+ACTIVE_TASK_STATUSES = frozenset(
+    {TaskStatus.QUEUED, TaskStatus.RUNNING, TaskStatus.WAITING_APPROVAL}
+)
+
+
+class ApprovalStatus(StrEnum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
+class RiskLevel(StrEnum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+class Truth(StrEnum):
+    """Business-truth labels (spec section 54). Every stored number says which one it is."""
+
+    FACT = "fact"
+    ESTIMATE = "estimate"
+    PREDICTION = "prediction"
+    ASSUMPTION = "assumption"
+    RECOMMENDATION = "recommendation"
+
+
+class RevenueCategory(StrEnum):
+    SAAS = "saas"
+    WEBSITES = "websites"
+    AUTOMATION = "automation"
+    AI_CONSULTING = "ai_consulting"
+    CONTENT = "content"
+    DIGITAL_PRODUCTS = "digital_products"
+    AFFILIATE = "affiliate"
+    SUBSCRIPTIONS = "subscriptions"
+    LEAD_GENERATION = "lead_generation"
+    OTHER = "other"
+
+
+class LeadStatus(StrEnum):
+    NEW = "new"
+    QUALIFIED = "qualified"
+    CONTACTED = "contacted"
+    MEETING = "meeting"
+    WON = "won"
+    LOST = "lost"
