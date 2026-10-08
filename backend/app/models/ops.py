@@ -122,7 +122,7 @@ class Autopilot(TimestampMixin, Base):
     __tablename__ = "autopilot"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     cities: Mapped[list[str]] = mapped_column(JSON, default=list)
     categories: Mapped[list[str]] = mapped_column(JSON, default=list)
     interval_minutes: Mapped[int] = mapped_column(Integer, default=30)

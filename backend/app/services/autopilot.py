@@ -34,9 +34,11 @@ MIN_INTERVAL, MAX_INTERVAL = 10, 1440
 def get(db: Session) -> Autopilot:
     row = db.scalar(select(Autopilot).limit(1))
     if row is None:
+        # On by default: MATT starts working as soon as it is installed. The owner can pause it.
         row = Autopilot(
-            enabled=False, cities=list(DEFAULT_CITIES), categories=list(DEFAULT_CATEGORIES),
-            interval_minutes=30, daily_outreach_drafts=5, cursor=0,
+            enabled=True, next_cycle_at=datetime.now(UTC), cities=list(DEFAULT_CITIES),
+            categories=list(DEFAULT_CATEGORIES), interval_minutes=30, daily_outreach_drafts=5,
+            cursor=0,
         )  # fmt: skip
         db.add(row)
         db.commit()
@@ -133,6 +135,8 @@ def tick(db: Session, router: ModelRouter, *, force: bool = False) -> Task | Non
     now = datetime.now(UTC)
     if not row.enabled and not force:
         return None
+    if db.scalar(select(User.id).limit(1)) is None:
+        return None  # nobody to report to or approve anything yet
     due = row.next_cycle_at
     if due is not None and due.tzinfo is None:
         due = due.replace(tzinfo=UTC)

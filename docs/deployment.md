@@ -47,7 +47,7 @@ is re-queued when it wakes.
 
 ### Keep autopilot running (free)
 
-Autopilot (Settings → Autopilot, or say "start autopilot") needs the service awake. Point a free
+Autopilot is on by default (the owner can pause it in Settings or by voice) and needs the service awake. Point a free
 uptime monitor at the health check so it never sleeps:
 
 1. Sign up at https://uptimerobot.com (free) and add an HTTP(s) monitor.

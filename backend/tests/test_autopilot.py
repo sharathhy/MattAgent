@@ -33,15 +33,15 @@ def test_only_owner_switches_autopilot(
     client: TestClient, owner_headers: dict[str, str], admin_headers: dict[str, str]
 ) -> None:
     status = client.get("/api/autopilot", headers=admin_headers).json()
-    assert status["enabled"] is False and status["cities"]
+    assert status["enabled"] is True and status["cities"]  # on by default
     assert (
-        client.put("/api/autopilot", json={"enabled": True}, headers=admin_headers).status_code
+        client.put("/api/autopilot", json={"enabled": False}, headers=admin_headers).status_code
         == 403
     )
     r = client.put(
-        "/api/autopilot", json={"enabled": True, "cities": ["Mysuru"]}, headers=owner_headers
+        "/api/autopilot", json={"enabled": False, "cities": ["Mysuru"]}, headers=owner_headers
     )
-    assert r.json()["enabled"] is True and r.json()["cities"] == ["Mysuru"]
+    assert r.json()["enabled"] is False and r.json()["cities"] == ["Mysuru"]
     bad = client.put("/api/autopilot", json={"categories": ["spaceships"]}, headers=owner_headers)
     assert bad.status_code == 400
 
@@ -56,7 +56,8 @@ def test_cycles_without_ai_report_then_discover(
 ) -> None:
     client.app.state.model_router = ModelRouter(settings, providers=[])  # type: ignore[attr-defined]
     router = _router(client)
-    assert autopilot.tick(db, router) is None  # off by default
+    client.put("/api/autopilot", headers=owner_headers, json={"enabled": False})
+    assert autopilot.tick(db, router) is None  # paused by the owner
     client.put(
         "/api/autopilot",
         headers=owner_headers,
@@ -116,6 +117,10 @@ def test_with_ai_it_drafts_outreach_for_approval_and_never_sends(
         for t in db.query(Task).all()
         if t.input.get("workflow") != "opportunity_research"
     )
+
+
+def test_waits_for_an_owner(db: Session, settings: Settings) -> None:
+    assert autopilot.tick(db, ModelRouter(settings, providers=[])) is None
 
 
 def test_voice_controls_autopilot(
