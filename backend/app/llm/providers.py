@@ -1,5 +1,6 @@
 """Model providers behind one interface. Each returns text plus token usage."""
 
+import re
 import time
 from dataclasses import dataclass, replace
 from typing import Any, Protocol
@@ -109,7 +110,8 @@ class GeminiProvider(OpenAICompatibleProvider):
         except ProviderError as exc:
             if "HTTP 404" not in str(exc):
                 raise
-            current = self.discover_model()
+            # Google's 404 usually names the replacement ("Please ... use models/<name>").
+            current = suggested_model(str(exc), self.spec.model) or self.discover_model()
             if current is None or current == self.spec.model:
                 raise
             self.spec = replace(self.spec, model=current)
@@ -129,6 +131,19 @@ class GeminiProvider(OpenAICompatibleProvider):
         return pick_gemini_model(ids, self.PREFERRED, self.SKIP)
 
 
+def suggested_model(error: str, current: str) -> str | None:
+    """The replacement model a Gemini error message recommends, if it names one."""
+    for match in re.findall(r"use (?:models/)?(gemini-[\w.-]*flash[\w.-]*)", error):
+        name = str(match).rstrip(".")
+        if name != current and not any(word in name for word in GeminiProvider.SKIP):
+            return name
+    return None
+
+
+def _version(model_id: str) -> tuple[float, ...]:
+    return tuple(float(n) for n in re.findall(r"\d+(?:\.\d+)?", model_id)[:1]) or (0.0,)
+
+
 def pick_gemini_model(
     ids: list[str], preferred: tuple[str, ...], skip: tuple[str, ...]
 ) -> str | None:
@@ -137,7 +152,8 @@ def pick_gemini_model(
             return name
     flash = [i for i in ids if "flash" in i and not any(word in i for word in skip)]
     stable = [i for i in flash if "preview" not in i] or flash
-    return sorted(stable, reverse=True)[0] if stable else None
+    # Newest version first; the full Flash model before Flash-Lite of the same version.
+    return max(stable, key=lambda i: (_version(i), "lite" not in i), default=None)
 
 
 class AnthropicProvider:

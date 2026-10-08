@@ -5,7 +5,7 @@ import pytest
 
 from app.core.config import Settings
 from app.llm import providers
-from app.llm.providers import GeminiProvider, ModelSpec, pick_gemini_model
+from app.llm.providers import GeminiProvider, ModelSpec, pick_gemini_model, suggested_model
 from app.llm.router import ModelRouter
 from tests.fakes import free, paid
 
@@ -60,3 +60,19 @@ def test_free_models_only_blocks_paid_and_premium(settings: Settings) -> None:
 def test_free_models_only_skips_anthropic_key(settings: Settings) -> None:
     settings.anthropic_api_key = "set"
     assert all(p.spec.provider != "anthropic" for p in ModelRouter(settings).providers)
+
+
+def test_newest_full_flash_beats_lite_and_older() -> None:
+    ids = ["gemini-3.5-flash-lite", "gemini-3.8-flash-lite-tts", "gemini-3.7-flash",
+           "gemini-3.8-flash", "gemini-3.8-live", "gemini-2.5-flash"]  # fmt: skip
+    assert pick_gemini_model(ids, (), GeminiProvider.SKIP) == "gemini-3.8-flash"
+
+
+def test_follows_the_replacement_google_names_in_the_error() -> None:
+    error = (
+        'gemini HTTP 404: [{ "error": { "code": 404, "message": "This model '
+        "models/gemini-2.5-flash is no longer available to new users. Please update your code "
+        "to use models/gemini-3.8-flash for the latest features and improvements."
+    )
+    assert suggested_model(error, "gemini-2.5-flash") == "gemini-3.8-flash"
+    assert suggested_model("HTTP 404: not found", "gemini-2.5-flash") is None

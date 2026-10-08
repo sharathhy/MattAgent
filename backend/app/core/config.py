@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     # --- AI model router (free-first). Keys come only from the environment. ---
     gemini_api_key: str | None = None
     #: Alias Google keeps pointed at its current free-tier Flash model.
-    gemini_model: str = "gemini-flash-latest"
+    gemini_model: str = "gemini-3.8-flash"
     groq_api_key: str | None = None
     groq_model: str = "llama-3.3-70b-versatile"
     ollama_url: str | None = None
