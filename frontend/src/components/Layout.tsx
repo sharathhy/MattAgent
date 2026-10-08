@@ -1,11 +1,22 @@
 import { Activity, LogOut } from "lucide-react";
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 
 import { useAuth } from "../lib/auth";
 import { NAV } from "../lib/navigation";
+import { VoiceProvider } from "../voice/VoiceProvider";
+import { BrainOrb } from "./BrainOrb";
 
 export function Layout() {
+  return (
+    <VoiceProvider>
+      <Shell />
+    </VoiceProvider>
+  );
+}
+
+function Shell() {
   const { user, logout } = useAuth();
+  const { pathname } = useLocation();
   return (
     <div className="flex min-h-screen">
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-line bg-slate-950/40 p-4 backdrop-blur md:flex">
@@ -58,6 +69,7 @@ export function Layout() {
         </nav>
         <Outlet />
       </main>
+      {pathname !== "/command-center" && <BrainOrb />}
     </div>
   );
 }

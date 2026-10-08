@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { Mic } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { api } from "../api/client";
+import { BrainConsole } from "../components/BrainConsole";
 import { ErrorState, Loading, Panel, PendingStat, Stat } from "../components/ui";
+import { VoiceLockPanel } from "../components/VoiceLockPanel";
 import { titleCase } from "../lib/format";
 
 export function CommandCenterPage() {
@@ -28,6 +29,8 @@ export function CommandCenterPage() {
           {health.data && <span className="text-muted">· DB {health.data.database} · {health.data.env}</span>}
         </div>
       </header>
+
+      <BrainConsole />
 
       <section aria-label="Business metrics" className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6">
         <PendingStat label="Company Value" phase={5} />
@@ -67,15 +70,7 @@ export function CommandCenterPage() {
         </>
       )}
 
-      <Panel title="Command console">
-        <div className="flex items-center gap-3">
-          <input className="input" disabled placeholder="Matt, what should we do next?" aria-label="Command" />
-          <button type="button" className="btn" disabled aria-label="Voice command">
-            <Mic className="h-4 w-4" aria-hidden />
-          </button>
-        </div>
-        <p className="mt-2 text-xs text-muted">Coming soon · commands in Phase 2 (orchestrator), voice in Phase 6.</p>
-      </Panel>
+      <VoiceLockPanel />
     </div>
   );
 }
