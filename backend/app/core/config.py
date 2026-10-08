@@ -38,7 +38,8 @@ class Settings(BaseSettings):
 
     # --- AI model router (free-first). Keys come only from the environment. ---
     gemini_api_key: str | None = None
-    gemini_model: str = "gemini-2.5-flash"
+    #: Alias Google keeps pointed at its current free-tier Flash model.
+    gemini_model: str = "gemini-flash-latest"
     groq_api_key: str | None = None
     groq_model: str = "llama-3.3-70b-versatile"
     ollama_url: str | None = None
@@ -47,6 +48,8 @@ class Settings(BaseSettings):
     anthropic_model: str = "claude-opus-5-5"
     #: Premium (paid) models are only used when explicitly allowed.
     allow_premium_models: bool = False
+    #: Hard rule: only free and local models are ever called. Paid providers are not even built.
+    free_models_only: bool = True
     #: Spend limits for paid model usage, in INR. MATT stops and asks for approval at the limit.
     daily_ai_budget_inr: float = Field(default=0, ge=0)
     monthly_ai_budget_inr: float = Field(default=0, ge=0)

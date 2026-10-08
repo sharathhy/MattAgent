@@ -19,6 +19,7 @@ def test_no_provider_configured(settings: Settings, db: Session) -> None:
 
 def test_free_first_and_fallback_recorded(settings: Settings, db: Session) -> None:
     broken, cheap = free(fail=True), paid()
+    settings.free_models_only = False
     settings.daily_ai_budget_inr = settings.monthly_ai_budget_inr = 100
     router = ModelRouter(settings, providers=[cheap, broken])
     result = router.complete(db, system="s", prompt="p")
@@ -30,6 +31,7 @@ def test_free_first_and_fallback_recorded(settings: Settings, db: Session) -> No
 
 
 def test_paid_models_blocked_by_zero_budget(settings: Settings, db: Session) -> None:
+    settings.free_models_only = False
     router = ModelRouter(settings, providers=[paid()])
     with pytest.raises(BudgetExceeded, match="Daily"):
         router.complete(db, system="s", prompt="p")
@@ -39,6 +41,7 @@ def test_paid_models_blocked_by_zero_budget(settings: Settings, db: Session) -> 
 def test_premium_needs_opt_in(settings: Settings, db: Session) -> None:
     premium = paid()
     object.__setattr__(premium.spec, "tier", "premium")
+    settings.free_models_only = False
     assert not ModelRouter(settings, providers=[premium]).available
     settings.allow_premium_models = True
     assert ModelRouter(settings, providers=[premium]).available

@@ -35,11 +35,20 @@ MATT's agents need at least one model key. The cheapest is free:
 2. In Render, open the `matt` service, then Environment, and set `MATT_GEMINI_API_KEY`.
    Never paste keys into chat, issues or the repository.
 
-Optional: `MATT_GROQ_API_KEY` (free tier), `MATT_OLLAMA_URL` (your own server), and
-`MATT_ANTHROPIC_API_KEY` with `MATT_ALLOW_PREMIUM_MODELS=true` for Claude. Claude calls use the
-API's server-side fallback, so a refused request is retried once on a fallback model.
-Paid models run only within `MATT_DAILY_AI_BUDGET_INR` and `MATT_MONTHLY_AI_BUDGET_INR`
-(default 0, so they never run without your approval).
+**Free tier only.** `MATT_FREE_MODELS_ONLY` is `true` by default: the router refuses every paid
+or premium model in code, and an Anthropic key is ignored. Keep billing switched off on the
+Google Cloud project behind your AI Studio key; then the key stays on the free tier and going
+over the free limit returns "429 rate limited" instead of a charge. Never upgrade the key's plan.
+MATT uses `gemini-flash-latest` by default; if Google retires a model name (a 404), MATT asks
+the API which models the key can use and switches to the current free Flash model by itself.
+
+Autopilot keeps within the free limits: one main action every 15 minutes plus at most 48
+skill-bot turns a day, one at a time.
+
+Optional: `MATT_GROQ_API_KEY` (free tier) and `MATT_OLLAMA_URL` (your own server). Setting
+`MATT_FREE_MODELS_ONLY=false` would allow paid models (for example Claude with
+`MATT_ANTHROPIC_API_KEY` and `MATT_ALLOW_PREMIUM_MODELS=true`), and even then only within
+`MATT_DAILY_AI_BUDGET_INR` and `MATT_MONTHLY_AI_BUDGET_INR` (default 0).
 
 The worker runs inside the web service. On Render's free plan the service sleeps after about
 15 minutes without visitors, which also pauses the worker and autopilot; anything left running

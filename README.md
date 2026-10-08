@@ -18,8 +18,9 @@ What works today:
 - **Agents that do work.** Any of the 120 registered agents can take an objective. The CEO and
   executives can delegate to their teams. Work runs on a database-backed queue with retries and
   exponential backoff; failures are recorded, never hidden.
-- **Free-first model router.** Gemini free tier, Groq, local Ollama, then Claude only if you opt
-  in. Paid models stop at your daily and monthly INR budget and ask you in Approvals.
+- **Free-tier model router.** Gemini free tier, Groq free tier or local Ollama. Paid and
+  premium models are locked out by `MATT_FREE_MODELS_ONLY` (on by default); if you ever unlock
+  them they stop at your daily and monthly INR budget and ask you in Approvals.
 - **Website opportunity pipeline.** Discover businesses on OpenStreetMap by city and category,
   audit their websites (UX, design, SEO, mobile, performance, conversion, technical), rank leads,
   and draft outreach that waits for your approval.

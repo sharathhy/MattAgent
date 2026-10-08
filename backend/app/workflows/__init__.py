@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.agents import runtime
 from app.core.domain import ApprovalStatus, LeadStatus, RiskLevel, Truth
-from app.llm.router import ModelRouter
+from app.llm.router import ModelRouter, NoModelAvailable
 from app.models import Agent, Approval, Business, Lead, Opportunity
 from app.plugins import business_discovery, website_auditor
 from app.services import events
@@ -313,13 +313,18 @@ def daily_report(ctx: Context, params: dict[str, Any]) -> dict[str, Any]:
         lines.append("- Top opportunities: " + "; ".join(facts["top_opportunities"]) + ".")
     if ctx.router.available:
         ctx.emit("workflow.step", step="report", message="CEO is writing recommendations")
-        result = runtime.run(
-            ctx.db, ctx.router, _agent(ctx.db, "ceo"),
-            "Using only these facts, give the owner 3 short, concrete RECOMMENDATIONS for today "
-            "that move toward the first or next paying customer. No invented numbers.",
-            context=facts, task_id=ctx.task_id, override_budget=ctx.override_budget,
-        )  # fmt: skip
-        lines += ["", "Recommendations:", result.text]
+        try:
+            result = runtime.run(
+                ctx.db, ctx.router, _agent(ctx.db, "ceo"),
+                "Using only these facts, give the owner 3 short, concrete RECOMMENDATIONS for "
+                "today that move toward the first or next paying customer. No invented numbers.",
+                context=facts, task_id=ctx.task_id, override_budget=ctx.override_budget,
+            )  # fmt: skip
+            lines += ["", "Recommendations:", result.text]
+        except NoModelAvailable as exc:
+            # The facts still matter: save them so the day has a report and autopilot moves on.
+            log.warning("daily report without recommendations: %s", exc)
+            lines += ["", f"AI recommendations unavailable this time ({str(exc)[:160]})."]
     else:
         lines += ["", "Add an AI model key for written recommendations."]
     report = "\n".join(lines)
@@ -337,4 +342,61 @@ WORKFLOWS["daily_report"] = (
     "Write the CEO's daily report from MATT's records, with recommendations when AI is on.",
     daily_report,
     False,
+)
+
+
+def skill_bot(ctx: Context, params: dict[str, Any]) -> dict[str, Any]:
+    """One skill works on its own: it produces one useful work product in its own field from
+    MATT's real records and saves it to memory. It never contacts anyone, spends or publishes."""
+    from app.models import Knowledge
+    from app.services import earnings
+
+    agent = _agent(ctx.db, str(params["agent_slug"]))
+    e = earnings.summary(ctx.db, ctx.router.settings.timezone, days=1)
+    leads = ctx.db.scalars(
+        select(Lead)
+        .join(Business)
+        .order_by(Business.opportunity_score.desc().nulls_last())
+        .limit(5)
+    ).all()
+    facts = {
+        "revenue_today_inr": e["today_inr"],
+        "revenue_month_inr": e["month_inr"],
+        "top_leads": [
+            f"{lead.business.name} ({lead.business.category}, {lead.business.city}): "
+            f"score {lead.business.opportunity_score or 0:.0f}, status {lead.status}"
+            for lead in leads
+        ],
+        "top_opportunities": [
+            f"{o.title} ({o.score:.0f}, estimate)"
+            for o in ctx.db.scalars(select(Opportunity).order_by(Opportunity.score.desc()).limit(3))
+        ],
+        "your_outputs": agent.outputs,
+    }
+    ctx.emit("workflow.step", step="bot", message=f"{agent.name} is working on its own")
+    result = runtime.run(
+        ctx.db, ctx.router, agent,
+        "Work on your own: produce ONE concrete, useful work product in your field that helps "
+        "MATT win or serve its next paying customer (for example a checklist, a short plan, a "
+        "draft, or an analysis of the leads below). Use only these facts; label each claim FACT, "
+        "ESTIMATE, PREDICTION, ASSUMPTION or RECOMMENDATION. Do not contact anyone, spend money "
+        "or publish anything; say what would need the owner's approval instead.",
+        context=facts, task_id=ctx.task_id, override_budget=ctx.override_budget, max_tokens=700,
+    )  # fmt: skip
+    note = Knowledge(
+        kind="agent", title=f"{agent.name}: work product", content=result.text,
+        tags=["skill-bot", "autopilot", agent.department], agent_slug=agent.slug,
+        source="autopilot",
+    )  # fmt: skip
+    ctx.db.add(note)
+    ctx.db.commit()
+    ctx.emit("bot.output", knowledge_id=note.id, agent=agent.slug)
+    first = next((ln.strip() for ln in result.text.splitlines() if ln.strip()), "Done")
+    return {"summary": first[:300], "knowledge_id": note.id, "agent": agent.slug}
+
+
+WORKFLOWS["skill_bot"] = (
+    "Let one skill work on its own and save its work product to memory (AI model needed).",
+    skill_bot,
+    True,
 )

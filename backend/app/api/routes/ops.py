@@ -152,7 +152,7 @@ def get_settings_view(_: Admin, settings: AppSettings, model_router: Router) -> 
                 "quality": s.quality,
                 "paid": s.paid,
                 "rate_limit": s.rate_limit,
-                "enabled": s.tier != "premium" or settings.allow_premium_models,
+                "enabled": model_router.allowed(s),
             }
             for s in model_router.catalog()
         ],
@@ -162,6 +162,7 @@ def get_settings_view(_: Admin, settings: AppSettings, model_router: Router) -> 
             "MATT_OLLAMA_URL": bool(settings.ollama_url),
             "MATT_ANTHROPIC_API_KEY": bool(settings.anthropic_api_key),
         },
+        "free_models_only": settings.free_models_only,
         "allow_premium_models": settings.allow_premium_models,
         "daily_ai_budget_inr": settings.daily_ai_budget_inr,
         "monthly_ai_budget_inr": settings.monthly_ai_budget_inr,

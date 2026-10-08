@@ -23,7 +23,7 @@ export function AutopilotPanel({ full = false }: { full?: boolean }) {
         <h2 className="font-semibold">Autopilot {s ? (s.enabled ? "on" : "off") : ""}</h2>
         <span className="min-w-0 flex-1 truncate text-sm text-muted">
           {s?.enabled
-            ? `${s.last_action ?? "Starting"} · ${s.cycles_today} actions today${s.next_cycle_at ? ` · next ${formatDate(s.next_cycle_at)}` : ""}`
+            ? `${s.last_action ?? "Starting"} · ${s.cycles_today} actions today (${s.bots_today} skill-bot turns)${s.next_cycle_at ? ` · next ${formatDate(s.next_cycle_at)}` : ""}`
             : "Paused by the owner. MATT works only when you ask."}
         </span>
         {canRun && s?.enabled && (
@@ -48,8 +48,15 @@ export function AutopilotPanel({ full = false }: { full?: boolean }) {
       <p className="mt-2 text-xs text-muted">
         When on, the CEO picks the most valuable next step on a schedule: the daily report, finding and auditing leads,
         researching opportunities{s && !s.ai_model_available ? " (needs an AI key)" : ""}, and drafting pitches that wait
-        in Approvals. It never sends, spends or publishes on its own.
+        in Approvals. Each cycle one skill also works on its own as an AI bot (up to {s?.daily_bot_tasks ?? 48} a day) and
+        saves its work to Memory. It never sends, spends or publishes on its own.
       </p>
+      {s && (
+        <p className="mt-1 text-xs text-muted">
+          {s.last_tick_at ? `Scheduler last checked in ${formatDate(s.last_tick_at)}. ` : "Scheduler has not checked in yet. "}
+          {s.free_models_only ? "AI: free-tier models only." : "AI: paid models allowed within budget."}
+        </p>
+      )}
       <ActionError error={toggle.error ?? runNow.error} />
       {full && s && <Targets status={s} canEdit={isOwner} />}
       {s && s.recent.length > 0 && (

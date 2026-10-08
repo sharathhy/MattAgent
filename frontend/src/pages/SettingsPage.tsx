@@ -34,6 +34,7 @@ export function SettingsPage() {
           <dl className="space-y-2 text-sm">
             <div className="flex justify-between"><dt>Daily limit (paid models)</dt><dd className="font-mono">{inr(s.daily_ai_budget_inr)}</dd></div>
             <div className="flex justify-between"><dt>Monthly limit (paid models)</dt><dd className="font-mono">{inr(s.monthly_ai_budget_inr)}</dd></div>
+            <div className="flex justify-between"><dt>Free-tier AI only</dt><dd><Badge value={s.free_models_only ? "approved" : "rejected"} /></dd></div>
             <div className="flex justify-between"><dt>Premium models</dt><dd><Badge value={s.allow_premium_models ? "approved" : "rejected"} /></dd></div>
           </dl>
           <p className="mt-3 text-xs text-muted">

@@ -233,6 +233,7 @@ def test_budget_exhaustion_parks_task_for_approval(
 ) -> None:
     from tests.fakes import paid
 
+    settings.free_models_only = False
     client.app.state.model_router = ModelRouter(settings, providers=[paid()])  # type: ignore[attr-defined]
     task_id = client.post(
         "/api/tasks", headers=owner_headers, json={"objective": "Deep analysis"}
