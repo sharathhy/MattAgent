@@ -80,7 +80,7 @@ AUTOPILOT_OFF = re.compile(
     r"|^(stop working|pause work)$"
 )
 AUTOPILOT_STATUS = re.compile(r"\bwhat are you (working on|doing)\b|\bautopilot( status)?\b")
-HELP = re.compile(r"\b(what can you do|help|how do (?:i|you) use)\b")
+HELP = re.compile(r"^(?:what can you do|help|how do (?:i|you) use (?:you|matt|this))$")
 
 MULTIPLIER = {"k": 1_000, "thousand": 1_000, "lakh": 100_000, "lakhs": 100_000,
               "lac": 100_000, "crore": 10_000_000}  # fmt: skip
@@ -147,7 +147,7 @@ def answer(db: Session, user: User, raw: str, tz: str) -> Answer | None:
             'I can find businesses and rank leads ("find dentists in Mysore"), audit a '
             "website, tell you today's earnings, log a payment (\"record 15,000 from a website "
             'project"), read your approvals and top leads, remember things, open any page, and '
-            "pass bigger questions to the CEO agent.",
+            "answer anything else and hand work to the team. Just ask in your own words.",
             "help",
         )
     if AUTOPILOT_ON.search(text) or AUTOPILOT_OFF.search(text):

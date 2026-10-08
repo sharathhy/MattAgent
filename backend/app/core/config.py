@@ -81,6 +81,8 @@ class Settings(BaseSettings):
     # --- Background worker ---
     worker_enabled: bool = True
     worker_poll_seconds: float = Field(default=1.0, gt=0)
+    #: Tasks run side by side (Postgres only), so bots on different free providers run at once.
+    worker_threads: int = Field(default=4, ge=1, le=16)
 
     login_rate_limit: int = Field(default=10, ge=1, description="Login attempts per window")
     login_rate_window_seconds: int = Field(default=60, ge=1)

@@ -33,6 +33,8 @@ RESEARCH_FOCUS = [
 MIN_INTERVAL, MAX_INTERVAL = 10, 1440
 DEFAULT_INTERVAL = 15
 BOT_PREFIX = "Skill bot: "
+#: Skill-bot turns per free AI provider per day (one model call each, well inside free tiers).
+BOTS_PER_PROVIDER = 144
 BOT_KINDS = (AgentKind.SKILL, AgentKind.EXECUTIVE, AgentKind.META)
 
 
@@ -43,7 +45,7 @@ def get(db: Session) -> Autopilot:
         row = Autopilot(
             enabled=True, next_cycle_at=datetime.now(UTC), cities=list(DEFAULT_CITIES),
             categories=list(DEFAULT_CATEGORIES), interval_minutes=DEFAULT_INTERVAL,
-            daily_outreach_drafts=5, cursor=0, daily_bot_tasks=48, bot_cursor=0,
+            daily_outreach_drafts=5, cursor=0, daily_bot_tasks=BOTS_PER_PROVIDER, bot_cursor=0,
         )  # fmt: skip
         db.add(row)
         db.commit()
@@ -52,6 +54,9 @@ def get(db: Session) -> Autopilot:
         # person: bring it up to today's defaults.
         row.enabled, row.interval_minutes = True, DEFAULT_INTERVAL
         row.next_cycle_at = datetime.now(UTC)
+        db.commit()
+    if row.updated_by is None and row.daily_bot_tasks == 48:
+        row.daily_bot_tasks = BOTS_PER_PROVIDER  # the old one-bot-at-a-time budget
         db.commit()
     return row
 
@@ -140,29 +145,62 @@ def choose(db: Session, router: ModelRouter, row: Autopilot) -> tuple[str, dict[
             "Keep the lead pipeline full: next city and niche in rotation.")  # fmt: skip
 
 
-def next_bot(db: Session, router: ModelRouter, row: Autopilot) -> Agent | None:
-    """The next skill whose turn it is to work on its own, or None when it isn't time."""
-    if not router.available:
-        return None
-    bots = _count(db, Task.created_by == ACTOR, Task.objective.startswith(BOT_PREFIX),
-                  Task.created_at >= _day_start(router.settings.timezone))  # fmt: skip
-    waiting = _count(db, Task.created_by == ACTOR, Task.objective.startswith(BOT_PREFIX),
-                     Task.status.in_([TaskStatus.QUEUED, TaskStatus.RUNNING]))  # fmt: skip
-    if bots >= row.daily_bot_tasks or waiting:
-        return None  # one bot at a time keeps MATT inside the free tier's rate limits
+def _bot_tasks(db: Session, *where: Any) -> list[Task]:
+    return list(db.scalars(select(Task).where(
+        Task.created_by == ACTOR, Task.objective.startswith(BOT_PREFIX), *where
+    )))  # fmt: skip
+
+
+def queue_bots(db: Session, router: ModelRouter, row: Autopilot) -> list[Task]:
+    """Start the next batch of skill bots: one per free AI provider, all working at once.
+
+    Each bot starts on its own provider (falling back to the others), so free tiers are used
+    side by side. ``daily_bot_tasks`` is the budget per provider per day, spread evenly over
+    the day so the bots keep working around the clock instead of using it up in an hour.
+    """
+    lanes = router.lanes()
+    if not lanes or row.daily_bot_tasks <= 0:
+        return []
+    now = datetime.now(UTC)
+    today = _bot_tasks(db, Task.created_at >= _day_start(router.settings.timezone))
+    if len(today) >= row.daily_bot_tasks * len(lanes):
+        return []
+    last = max((t.created_at for t in today), default=None)
+    if last is not None and last.tzinfo is None:
+        last = last.replace(tzinfo=UTC)
+    if last is not None and now - last < timedelta(seconds=86_400 / row.daily_bot_tasks):
+        return []
+    active = _bot_tasks(db, Task.status.in_([TaskStatus.QUEUED, TaskStatus.RUNNING]))
+    busy = {t.input.get("params", {}).get("agent_slug") for t in active}
+    free = [lane for lane in lanes if lane not in {
+        t.input.get("params", {}).get("provider") for t in active
+    }]  # fmt: skip
     agents = db.scalars(
         select(Agent).where(Agent.kind.in_(list(BOT_KINDS)), Agent.status != AgentStatus.RETIRED)
         .order_by(Agent.id)
     ).all()  # fmt: skip
-    if not agents:
-        return None
-    agent = agents[row.bot_cursor % len(agents)]
-    row.bot_cursor += 1
-    return agent
+    queued: list[Task] = []
+    for lane in free:
+        for _ in range(len(agents)):
+            agent = agents[row.bot_cursor % len(agents)]
+            row.bot_cursor += 1
+            if agent.slug not in busy:
+                break
+        else:
+            break
+        busy.add(agent.slug)
+        task = tasks.create(db, kind="workflow", objective=f"{BOT_PREFIX}{agent.name}",
+                            input={"workflow": "skill_bot",
+                                   "params": {"agent_slug": agent.slug, "provider": lane}},
+                            created_by=ACTOR, priority=4, commit=False)  # fmt: skip
+        events.emit(db, "autopilot.bot", task_id=task.id, agent=agent.slug, provider=lane)
+        queued.append(task)
+    db.commit()
+    return queued
 
 
 def tick(db: Session, router: ModelRouter, *, force: bool = False) -> Task | None:
-    """Queue one autopilot action (plus one skill-bot turn) if one is due. Safe to call often."""
+    """Queue the next skill-bot batch and the main autopilot action when due. Safe to call often."""
     row = get(db)
     now = datetime.now(UTC)
     row.last_tick_at = now  # heartbeat, shown in the UI
@@ -171,6 +209,8 @@ def tick(db: Session, router: ModelRouter, *, force: bool = False) -> Task | Non
         return None
     if db.scalar(select(User.id).limit(1)) is None:
         return None  # nobody to report to or approve anything yet
+    # Skill bots work on their own clock, in parallel, whatever the main cycle is doing.
+    queue_bots(db, router, row)
     due = row.next_cycle_at
     if due is not None and due.tzinfo is None:
         due = due.replace(tzinfo=UTC)
@@ -189,12 +229,6 @@ def tick(db: Session, router: ModelRouter, *, force: bool = False) -> Task | Non
     row.last_cycle_at, row.last_action = now, objective
     row.next_cycle_at = now + timedelta(minutes=row.interval_minutes)
     events.emit(db, "autopilot.cycle", task_id=task.id, action=objective, reason=reason)
-    bot = next_bot(db, router, row)
-    if bot is not None:
-        bot_task = tasks.create(db, kind="workflow", objective=f"{BOT_PREFIX}{bot.name}",
-                                input={"workflow": "skill_bot", "params": {"agent_slug": bot.slug}},
-                                created_by=ACTOR, priority=4, commit=False)  # fmt: skip
-        events.emit(db, "autopilot.bot", task_id=bot_task.id, agent=bot.slug)
     db.commit()
     return task
 
@@ -221,6 +255,31 @@ def status(db: Session, router: ModelRouter) -> dict[str, Any]:
             Task.objective.startswith(BOT_PREFIX),
             Task.created_at >= today,
         ),
+        "bot_lanes": router.lanes(),
+        "bots_working": [
+            {
+                "task_id": t.id,
+                "agent": t.objective.removeprefix(BOT_PREFIX),
+                "provider": t.input.get("params", {}).get("provider"),
+                "status": t.status,
+                "started_at": t.started_at,
+            }
+            for t in _bot_tasks(db, Task.status.in_([TaskStatus.QUEUED, TaskStatus.RUNNING]))
+        ],
+        "bot_feed": [
+            {
+                "agent_slug": k.agent_slug,
+                "title": k.title,
+                "text": k.content[:600],
+                "created_at": k.created_at,
+            }
+            for k in db.scalars(
+                select(Knowledge)
+                .where(Knowledge.kind == "agent", Knowledge.source == "autopilot")
+                .order_by(Knowledge.id.desc())
+                .limit(8)
+            )
+        ],
         "last_tick_at": row.last_tick_at,
         "free_models_only": router.settings.free_models_only,
         "last_cycle_at": row.last_cycle_at,

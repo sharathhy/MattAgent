@@ -33,7 +33,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             tools.seed_tools(db)
         worker = None
         if settings.worker_enabled:
-            worker = Worker(factory, app.state.model_router, settings.worker_poll_seconds)
+            worker = Worker(
+                factory,
+                app.state.model_router,
+                settings.worker_poll_seconds,
+                settings.worker_threads,
+            )
             worker.start()
         try:
             yield

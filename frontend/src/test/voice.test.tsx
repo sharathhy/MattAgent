@@ -66,9 +66,16 @@ describe("commands", () => {
     expect(JSON.parse(fetch.mock.calls[0]?.[1]?.body as string)).toEqual({ text: "find gyms in Bangalore that need a website" });
   });
 
-  it("asks the CEO when a lookup matches no agent", async () => {
-    mockApi({ "/agents": [], "/command": { reply: "Our best bet is local SEO.", intent: "ceo", task_id: 8, data: {} } });
+  it("asks MATT's brain when a lookup matches no agent", async () => {
+    mockApi({ "/agents": [], "/command": { reply: "Our best bet is local SEO.", intent: "chat", task_id: null, data: {} } });
     expect((await runCommand("what is our best opportunity", ctx)).say).toBe("Our best bet is local SEO.");
+  });
+
+  it("sends real questions to the brain instead of a canned answer", async () => {
+    const agent = { slug: "seo-specialist", name: "SEO Specialist", kind: "skill" };
+    mockApi({ "/agents": [agent], "/command": { reply: "Paris.", intent: "chat", task_id: null, data: {} } });
+    expect((await runCommand("what is the capital of France", ctx)).say).toBe("Paris.");
+    expect((await runCommand("help me write an email to a client", ctx)).say).toBe("Paris.");
   });
 
   it("goes back to sleep on stop", async () => {

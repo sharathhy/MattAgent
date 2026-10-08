@@ -389,6 +389,10 @@ export interface AutopilotStatus {
   daily_outreach_drafts: number;
   daily_bot_tasks: number;
   bots_today: number;
+  /** Free AI providers the bots spread across, one bot per provider at a time. */
+  bot_lanes: string[];
+  bots_working: { task_id: number; agent: string; provider: string | null; status: TaskStatus; started_at: string | null }[];
+  bot_feed: { agent_slug: string | null; title: string; text: string; created_at: string }[];
   last_tick_at: string | null;
   free_models_only: boolean;
   last_cycle_at: string | null;

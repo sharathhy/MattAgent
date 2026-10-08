@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from app.agents import runtime
 from app.core.domain import ApprovalStatus, LeadStatus, RiskLevel, Truth
 from app.llm.router import ModelRouter, NoModelAvailable
-from app.models import Agent, Approval, Business, Lead, Opportunity
+from app.models import Agent, Approval, Business, Experiment, Knowledge, Lead, Opportunity
 from app.plugins import business_discovery, website_auditor
 from app.services import events
 from app.services.errors import NotFoundError, ServiceError
@@ -398,12 +398,33 @@ def _bot_facts(ctx: Context, agent: Agent) -> dict[str, Any]:
         ],
         "your_skills": agent.capabilities,
         "your_outputs": agent.outputs,
+        # The bot's own brain: what it already tried and wrote, so it builds on it and learns.
+        "your_past_experiments": [
+            f"{x.name}: {x.status}" + (f", result: {x.result[:300]}" if x.result else "")
+            for x in ctx.db.scalars(
+                select(Experiment)
+                .where(Experiment.agent_slug == agent.slug)
+                .order_by(Experiment.id.desc())
+                .limit(5)
+            )
+        ],
+        "your_recent_notes": [
+            f"{k.title}: {k.content[:400]}"
+            for k in ctx.db.scalars(
+                select(Knowledge)
+                .where(Knowledge.agent_slug == agent.slug, Knowledge.kind == "agent")
+                .order_by(Knowledge.id.desc())
+                .limit(3)
+            )
+        ],
     }
 
 
 BOT_LIMITS = (
-    "Limits: you work only inside MATT. You cannot send messages, publish, sign up for services "
-    "or move money; the owner does those. Money only ever comes IN, to the owner's own account. "
+    "Limits: you work only inside MATT. You cannot send messages, publish, sign up for services, "
+    "sign in to the owner's Gmail or any account, or move money; the owner does those, so hand "
+    "them finished, ready-to-paste assets and exact click-by-click steps. Money only ever comes "
+    "IN, to the owner's own account. "
     "Use free tools only. Never invent facts or results; label claims FACT, ESTIMATE, "
     "PREDICTION, ASSUMPTION or RECOMMENDATION."
 )
@@ -420,9 +441,8 @@ def skill_bot(ctx: Context, params: dict[str, Any]) -> dict[str, Any]:
     real revenue is recorded."""
     from decimal import Decimal, InvalidOperation
 
-    from app.models import Experiment, Knowledge
-
     agent = _agent(ctx.db, str(params["agent_slug"]))
+    lane = params.get("provider")  # the free provider this bot starts on, for parallel work
     facts = _bot_facts(ctx, agent)
     running = ctx.db.scalar(
         select(Experiment).where(
@@ -434,11 +454,14 @@ def skill_bot(ctx: Context, params: dict[str, Any]) -> dict[str, Any]:
         result = runtime.run(
             ctx.db, ctx.router, agent,
             "Propose ONE small, legal experiment in your own field to earn money online for MATT's "
-            "owner in India, that you can mostly prepare yourself. Return ONLY a JSON object: "
+            "owner in India, that you can mostly prepare yourself. Pick a proven way people earn "
+            "online today, learn from your past experiments and do not repeat a failed one. "
+            "Return ONLY a JSON object: "
             '{"name", "hypothesis", "target" (who pays), "plan" (3 short steps you can do), '
             '"needs_money" (true only if it requires spending), "cost_inr" (0 if free), '
             '"expected" (ESTIMATE of revenue and how it is reached)}. ' + BOT_LIMITS,
             context=facts, task_id=ctx.task_id, override_budget=ctx.override_budget, max_tokens=700,
+            prefer=lane,
         )  # fmt: skip
         match = _JSON_OBJECT.search(result.text)
         try:
@@ -488,9 +511,11 @@ def skill_bot(ctx: Context, params: dict[str, Any]) -> dict[str, Any]:
         f"You are running your experiment '{running.name}'. Hypothesis: {running.hypothesis}. "
         f"{running.decision or ''} Do step {step} now and produce the actual work product (copy, "
         "offer, list, plan or draft), not a description of it. End with one line: "
-        "'NEXT: <your next step>' or, if it is ready, 'OWNER: <exactly what the owner must do "
-        "to earn the first rupee>'. " + BOT_LIMITS,
-        context=facts, task_id=ctx.task_id, override_budget=ctx.override_budget, max_tokens=900,
+        "'NEXT: <your next step>' or, if it is ready, 'OWNER: <numbered steps the owner can do "
+        "in minutes to earn the first rupee: which site, what to paste, what price>'. "
+        + BOT_LIMITS,
+        context=facts, task_id=ctx.task_id, override_budget=ctx.override_budget, max_tokens=1200,
+        prefer=lane,
     )  # fmt: skip
     note = Knowledge(
         kind="agent", title=f"{agent.name}: {running.name} (step {step})", content=result.text,

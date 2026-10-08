@@ -94,6 +94,7 @@ def run(
     task_id: int | None = None,
     override_budget: bool = False,
     max_tokens: int = 2000,
+    prefer: str | None = None,
 ) -> AgentResult:
     targets = delegation_targets(db, agent)
     routed = router.complete(
@@ -103,6 +104,7 @@ def run(
         task_id=task_id,
         max_tokens=max_tokens,
         override_budget=override_budget,
+        prefer=prefer,
     )
     text, delegations = parse_delegations(routed.completion.text, {a.slug for a in targets})
     return AgentResult(text=text, delegations=delegations, routed=routed)

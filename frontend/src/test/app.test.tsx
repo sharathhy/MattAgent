@@ -116,7 +116,10 @@ const DASHBOARD = {
 
 const AUTOPILOT = {
   enabled: true, cities: ["Mysuru"], categories: ["gyms"], interval_minutes: 15, daily_outreach_drafts: 5, daily_bot_tasks: 48, bots_today: 2,
-  last_tick_at: "2026-10-08T10:00:00Z", free_models_only: true,
+  last_tick_at: "2026-10-08T10:00:00Z", free_models_only: true, bot_lanes: ["gemini", "groq"],
+  bots_working: [{ task_id: 9, agent: "Sales Copywriter", provider: "groq", status: "running", started_at: null }],
+  bot_feed: [{ agent_slug: "sales-copywriter", title: "Sales Copywriter: Clinic pack (step 1)", text: "Offer: ...",
+    created_at: "2026-10-08T10:00:00Z" }],
   last_cycle_at: null, next_cycle_at: null, last_action: "Find gyms in Mysuru and rank website opportunities",
   cycles_today: 3, active: 1, ai_model_available: false, available_categories: ["gyms", "clinics"],
   recent: [], latest_report: null,
@@ -145,6 +148,8 @@ describe("command center", () => {
     expect(await screen.findByText("Autopilot on")).toBeInTheDocument();
     expect(screen.getByText(/AI: free-tier models only/)).toBeInTheDocument();
     expect(screen.getByText(/2 skill-bot turns/)).toBeInTheDocument();
+    expect(screen.getByText(/Bots at work · gemini, groq/)).toBeInTheDocument();
+    expect(screen.getByText("on groq")).toBeInTheDocument();
     expect(screen.getByRole("switch", { name: "Autopilot" })).toHaveAttribute("aria-checked", "true");
     await waitFor(() => expect(screen.getByText(/Core ok/)).toBeInTheDocument());
     // HUD revenue panel: today's money and the skills earning it.

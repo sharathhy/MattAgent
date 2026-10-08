@@ -23,10 +23,18 @@ AUTOPILOT_EVERY = timedelta(seconds=15)
 
 
 class Worker:
-    def __init__(self, factory: sessionmaker[Session], router: ModelRouter, poll: float) -> None:
+    def __init__(
+        self, factory: sessionmaker[Session], router: ModelRouter, poll: float, threads: int = 1
+    ) -> None:
         self.factory, self.router, self.poll = factory, router, poll
         self._stop = threading.Event()
-        self._thread = threading.Thread(target=self._run, name="matt-worker", daemon=True)
+        self._threads = [threading.Thread(target=self._run, name="matt-worker", daemon=True)]
+        with factory() as db:  # SKIP LOCKED makes parallel claiming safe; SQLite has none
+            parallel = db.get_bind().dialect.name == "postgresql"
+        for i in range(1, threads if parallel else 1):
+            self._threads.append(
+                threading.Thread(target=self._drain, name=f"matt-worker-{i}", daemon=True)
+            )
 
     def start(self) -> None:
         with self.factory() as db:
@@ -36,11 +44,25 @@ class Worker:
                 .values(status=TaskStatus.QUEUED)
             )
             db.commit()
-        self._thread.start()
+        for thread in self._threads:
+            thread.start()
 
     def stop(self) -> None:
         self._stop.set()
-        self._thread.join(timeout=10)
+        for thread in self._threads:
+            thread.join(timeout=10)
+
+    def _drain(self) -> None:
+        """Extra workers: only run queued tasks, so several bots think at the same time."""
+        while not self._stop.is_set():
+            try:
+                with self.factory() as db:
+                    worked = tasks.process_next(db, self.router) is not None
+            except Exception:
+                log.exception("worker loop error")
+                worked = False
+            if not worked:
+                self._stop.wait(self.poll)
 
     def _run(self) -> None:
         last_housekeeping = utcnow() - HOUSEKEEPING_EVERY
