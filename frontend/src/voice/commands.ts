@@ -50,6 +50,14 @@ export const CAPABILITIES =
   "agent and its team. I can also set timers and reminders, do quick maths, search the web, play YouTube, " +
   "open any page, look up any agent, and sign you out.";
 
+// Mirrors backend app/core/money.py. Money only ever comes in, so anything that sounds like moving money out
+// skips every local shortcut and goes straight to /api/command, where the money rule refuses it.
+const MONEY = "(?:money|funds?|cash|₹|rs\\.?|inr|rupees?|amount|payment|upi|salary|fees?)";
+const ALWAYS_OUT = /\b(?:payouts?|pay\s*out|withdraw(?:al|s)?|debit(?:ed|s)?|refund(?:ed|s)?|chargeback)\b/i;
+const SEND_MONEY = new RegExp(`\\b(?:send|transfer|wire|remit|pay|move|disburse)\\b(?:\\s+\\S+){0,4}?\\s+${MONEY}\\b`, "i");
+const INBOUND = /\b(?:invoice|request|collect|receiv\w*|link|qr|bill)\b/i;
+export const isOutboundMoney = (text: string) => ALWAYS_OUT.test(text) || (SEND_MONEY.test(text) && !INBOUND.test(text));
+
 /** Interpret one spoken or typed command against the live MATT API. */
 export async function runCommand(raw: string, ctx: CommandContext): Promise<CommandOutcome> {
   const text = raw.trim().replace(/[.!?]+$/, "");
@@ -58,6 +66,8 @@ export async function runCommand(raw: string, ctx: CommandContext): Promise<Comm
 
   if (/^(stop|cancel|never ?mind|go to sleep|sleep|that's all|thanks?( you)?|nothing)$/.test(t))
     return { say: "Standing by.", sleep: true };
+
+  if (isOutboundMoney(text)) return askAgents(text);
 
   if (has(t, "sign out", "log out", "logout")) return { say: `Signing you out, ${ctx.userName}.`, logout: true };
 
