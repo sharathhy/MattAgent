@@ -193,6 +193,25 @@ describe("working pages", () => {
     });
   });
 
+  it("shows the plan and exact code of a change before the owner approves it", async () => {
+    tokenStore.set("tok");
+    mockApi({
+      "/auth/me": OWNER,
+      "/approvals": [{
+        id: 4, task_id: 2, agent_slug: "cto", action: "Open a pull request changing 1 file(s): Add a clock", kind: "code_change",
+        details: { change_id: 1, plan: "Add a clock to the header.", files: ["frontend/src/components/Layout.tsx"],
+          diff: "--- a/x\n+++ b/x\n@@ -1 +1 @@\n-old line\n+new line", note: "Approving opens a pull request. MATT never merges; you do." },
+        estimated_cost_inr: "0", risk_level: "high", status: "pending", decided_by: null, decided_at: null, note: null,
+        created_at: "2026-10-08T00:00:00Z",
+      }],
+    });
+    renderApp("/approvals");
+    expect(await screen.findByText("Add a clock to the header.")).toBeInTheDocument();
+    expect(screen.getByText("+new line")).toHaveClass("text-emerald-300");
+    expect(screen.getByText("-old line")).toHaveClass("text-rose-300");
+    expect(screen.getByText(/MATT never merges/)).toBeInTheDocument();
+  });
+
   it("hides approval buttons from people who cannot decide", async () => {
     tokenStore.set("tok");
     mockApi({
@@ -280,6 +299,8 @@ describe("working pages", () => {
         model_keys: { MATT_GEMINI_API_KEY: true }, free_models_only: true, allow_premium_models: false,
         daily_ai_budget_inr: 0, monthly_ai_budget_inr: 0, worker_enabled: true, email_sending: false,
       },
+      "/changes/config": { github_connected: false, repo: "sharathhy/MattAgent", base_branch: "main", free_models_only: true },
+      "/changes": [],
       "/payments/accounts": [{ id: 1, kind: "bank", label: "Main", holder_name: "Test Owner", bank_name: "Test Bank",
         ifsc: "ABCD0123456", masked: "•••• 9012", is_primary: true, updated_at: "2026-10-08T00:00:00Z" }],
       "/models/free-sources": [
@@ -298,5 +319,6 @@ describe("working pages", () => {
     expect(screen.getByRole("button", { name: "Scan now" })).toBeInTheDocument();
     expect(await screen.findByText("•••• 9012")).toBeInTheDocument();
     expect(screen.getByText("Where you get paid")).toBeInTheDocument();
+    expect(await screen.findByText(/Add MATT_GITHUB_TOKEN in Render/)).toBeInTheDocument();
   });
 });

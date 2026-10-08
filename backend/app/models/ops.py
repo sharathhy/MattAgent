@@ -151,3 +151,25 @@ class ModelSource(TimestampMixin, Base):
     free_models: Mapped[int] = mapped_column(Integer, default=0)
     error: Mapped[str | None] = mapped_column(Text)
     checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ChangeRequest(TimestampMixin, Base):
+    """A change to MATT's own code that the owner asked for. MATT drafts it; the owner approves
+    it; MATT opens a pull request; the owner merges it. MATT never merges or deploys itself."""
+
+    __tablename__ = "change_requests"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    request: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(30), index=True)
+    plan: Mapped[str | None] = mapped_column(Text)
+    files: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    diff: Mapped[str | None] = mapped_column(Text)
+    base_sha: Mapped[str | None] = mapped_column(String(64))
+    branch: Mapped[str | None] = mapped_column(String(200))
+    pr_url: Mapped[str | None] = mapped_column(String(500))
+    error: Mapped[str | None] = mapped_column(Text)
+    model: Mapped[str | None] = mapped_column(String(100))
+    approval_id: Mapped[int | None] = mapped_column(ForeignKey("approvals.id"))
+    task_id: Mapped[int | None] = mapped_column(ForeignKey("tasks.id"))
+    created_by: Mapped[str] = mapped_column(String(100))

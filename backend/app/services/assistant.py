@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from app.core import money
 from app.core.domain import ApprovalStatus, RevenueCategory
 from app.models import Approval, Knowledge, Lead, Opportunity, User
-from app.services import autopilot, earnings, events
+from app.services import autopilot, changes, earnings, events
 
 
 @dataclass
@@ -45,6 +45,10 @@ STREAM_WORDS = {
     "lead": RevenueCategory.LEAD_GENERATION, "product": RevenueCategory.DIGITAL_PRODUCTS,
 }  # fmt: skip
 
+CODE_CHANGE = re.compile(
+    r"^(?:please\s+)?(?:change|modify|update|edit|fix|improve|add)\b.*\b(?:your|matt'?s?)\s+"
+    r"(?:\w+\s+){0,2}?(?:code|codebase|app|ui|website|screen|page|interface)\b"
+)
 NAVIGATE = re.compile(r"^(?:open|show|go to|take me to)\s+(?:the\s+|my\s+)?([a-z ]+?)(?:\s+page)?$")
 RECORD = re.compile(
     r"\b(record|add|log|note|i (?:got|received|earned|made|spent|paid))\b.*?"
@@ -124,6 +128,16 @@ def answer(db: Session, user: User, raw: str, tz: str) -> Answer | None:
 
     if money.is_outbound(text):
         return Answer(money.REFUSAL, "money_rule")
+    if CODE_CHANGE.search(text):
+        if user.role != "owner":
+            return Answer("Only the owner can ask me to change my own code.", "code_change")
+        change = changes.create(db, user, raw.strip())
+        return Answer(
+            "I'll draft that change and show you the plan and the exact code in Approvals. "
+            "Nothing changes until you approve; then I open a pull request for you to merge.",
+            "code_change",
+            {"change_id": change.id, "navigate": "/settings"},
+        )
     if THANKS.match(text):
         return Answer("You're welcome.", "thanks")
     if DISMISS.match(text):

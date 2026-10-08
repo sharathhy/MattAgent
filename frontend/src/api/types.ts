@@ -468,3 +468,25 @@ export interface PaymentRequest {
   created_at: string;
   received_at: string | null;
 }
+
+export interface ChangeRequest {
+  id: number;
+  request: string;
+  status: "drafting" | "awaiting_approval" | "approved" | "pr_opened" | "rejected" | "failed";
+  plan: string | null;
+  files: string[];
+  diff: string | null;
+  branch: string | null;
+  pr_url: string | null;
+  error: string | null;
+  model: string | null;
+  approval_id: number | null;
+  created_at: string;
+}
+
+export interface ChangeConfig {
+  github_connected: boolean;
+  repo: string;
+  base_branch: string;
+  free_models_only: boolean;
+}

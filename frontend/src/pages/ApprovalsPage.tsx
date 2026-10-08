@@ -64,6 +64,12 @@ function PendingApproval({ approval }: { approval: Approval }) {
         </p>
       )}
       {typeof approval.details.reason === "string" && <p className="text-sm text-warn">{approval.details.reason}</p>}
+      {typeof approval.details.note === "string" && <p className="text-xs text-muted">{approval.details.note}</p>}
+      {typeof approval.details.expected === "string" && <p className="text-sm">{approval.details.expected}</p>}
+      {typeof approval.details.plan === "string" && (
+        <pre className="whitespace-pre-wrap rounded-lg bg-slate-950/60 p-4 font-sans text-sm">{approval.details.plan}</pre>
+      )}
+      {typeof approval.details.diff === "string" && <DiffView diff={approval.details.diff} />}
       {draft && <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-950/60 p-4 font-sans text-sm">{draft}</pre>}
       {canDecide ? (
         <div className="flex flex-wrap items-center gap-2">
@@ -78,5 +84,29 @@ function PendingApproval({ approval }: { approval: Approval }) {
       )}
       <ActionError error={decide.error} />
     </article>
+  );
+}
+
+/** A unified diff with added and removed lines coloured, for reviewing a code change. */
+export function DiffView({ diff }: { diff: string }) {
+  return (
+    <pre className="max-h-[32rem] overflow-auto rounded-lg bg-slate-950/80 p-3 font-mono text-xs leading-5">
+      {diff.split("\n").map((line, i) => (
+        <div
+          key={i}
+          className={
+            line.startsWith("+") && !line.startsWith("+++")
+              ? "bg-emerald-500/10 text-emerald-300"
+              : line.startsWith("-") && !line.startsWith("---")
+                ? "bg-rose-500/10 text-rose-300"
+                : line.startsWith("@@")
+                  ? "text-sky-300"
+                  : "text-slate-400"
+          }
+        >
+          {line || " "}
+        </div>
+      ))}
+    </pre>
   );
 }

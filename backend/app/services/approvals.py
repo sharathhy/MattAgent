@@ -55,6 +55,10 @@ def _apply(db: Session, approval: Approval, approve: bool) -> None:
                 if approve
                 else "Outreach rejected; revise or drop this lead"
             )
+    elif approval.kind == "code_change":
+        from app.services import changes
+
+        changes.decided(db, approval, approve)
     elif approval.kind == "investment":
         exp = db.get(Experiment, int(approval.details.get("experiment_id", 0)))
         if exp is not None and exp.status == "planned":

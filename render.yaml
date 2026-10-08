@@ -43,6 +43,10 @@ services:
         sync: false
       - key: MATT_UPI_PAYEE_NAME
         sync: false
+      # Change requests: a fine-grained GitHub token for this repository only (Contents and Pull
+      # requests: read and write). MATT opens pull requests with it after you approve; never merges.
+      - key: MATT_GITHUB_TOKEN
+        sync: false
       - key: MATT_FREE_MODELS_ONLY
         value: "true"
       - key: MATT_DAILY_AI_BUDGET_INR

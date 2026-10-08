@@ -519,3 +519,39 @@ WORKFLOWS["skill_bot"] = (
     skill_bot,
     True,
 )
+
+
+def code_change(ctx: Context, params: dict[str, Any]) -> dict[str, Any]:
+    """Draft an owner's change to MATT's own code; it then waits for approval."""
+    from app.services import changes
+
+    ctx.emit("workflow.step", step="draft", message="Drafting the code change")
+    row = changes.draft(ctx.db, ctx.router, ctx.router.settings, int(params["change_id"]),
+                        ctx.task_id)  # fmt: skip
+    if row.status == "failed":
+        return {"summary": f"Could not draft change #{row.id}: {row.error}", "change_id": row.id}
+    return {"summary": f"Change #{row.id} is drafted and waiting for your approval "
+            f"({len(row.files)} file(s)).", "change_id": row.id}  # fmt: skip
+
+
+def open_change_pr(ctx: Context, params: dict[str, Any]) -> dict[str, Any]:
+    """After the owner approves a change, open its pull request (never merged by MATT)."""
+    from app.services import changes
+
+    row = changes.open_pr(ctx.db, ctx.router.settings, int(params["change_id"]))
+    if row.status == "failed":
+        return {"summary": f"Could not open the pull request: {row.error}", "change_id": row.id}
+    return {"summary": f"Pull request opened: {row.pr_url}", "change_id": row.id,
+            "pr_url": row.pr_url}  # fmt: skip
+
+
+WORKFLOWS["code_change"] = (
+    "Draft an owner-requested change to MATT's own code for approval (AI model needed).",
+    code_change,
+    True,
+)
+WORKFLOWS["open_change_pr"] = (
+    "Open the pull request for an approved code change. MATT never merges.",
+    open_change_pr,
+    False,
+)

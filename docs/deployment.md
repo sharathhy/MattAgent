@@ -58,6 +58,18 @@ by UPI creates a payment request with a QR code and link that pays you directly.
 shows in PhonePe, press "Money received" (owner only) and it is recorded as revenue. MATT never
 sends, withdraws or debits money.
 
+### Changing MATT from the website
+
+Settings, "Change MATT" (owner only), or say "Hey Matt, change your code to …". MATT reads its
+repository, drafts a plan and the exact code with the free AI model, and shows both in
+Approvals. Nothing changes until you approve. Then MATT pushes a new branch and opens a pull
+request against `MATT_GITHUB_BASE_BRANCH` (default `claude/matt-foundation-cnz4ei`, the branch
+Render deploys); you review, let CI run and merge it, and Render redeploys. MATT never merges.
+
+Setup: on GitHub, Settings, Developer settings, Fine-grained tokens, create a token for only
+this repository with "Contents: read and write" and "Pull requests: read and write", and add it
+in Render as `MATT_GITHUB_TOKEN`. MATT refuses to change CI, deployment, lock or secret files.
+
 ### Free Model Scout
 
 Every 6 hours (and when the service starts) the Cost Optimization skill checks each free-tier

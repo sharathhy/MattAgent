@@ -1,5 +1,7 @@
 import type {
   AutopilotStatus,
+  ChangeConfig,
+  ChangeRequest,
   AgentDetail,
   AgentSummary,
   Analytics,
@@ -133,6 +135,9 @@ export const api = {
   makePrimaryAccount: (id: number) => post<ReceivingAccount>(`/payments/accounts/${id}/primary`, {}),
   removeReceivingAccount: (id: number) => request<null>(`/payments/accounts/${id}`, { method: "DELETE" }),
   cancelPayment: (id: number) => post<PaymentRequest>(`/payments/${id}/cancel`, {}),
+  changeConfig: () => request<ChangeConfig>("/changes/config"),
+  changes: () => request<ChangeRequest[]>("/changes"),
+  requestChange: (text: string) => post<ChangeRequest>("/changes", { request: text }),
   freeSources: () => request<FreeModelSource[]>("/models/free-sources"),
   runScout: () => post<FreeModelSource[]>("/models/scout", {}),
 

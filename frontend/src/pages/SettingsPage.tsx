@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { api } from "../api/client";
 import { AutopilotPanel } from "../components/AutopilotPanel";
+import { ChangeRequests } from "../components/ChangeRequests";
 import { FreeModelScout } from "../components/FreeModelScout";
 import { ReceivingAccounts } from "../components/ReceivingAccounts";
 import { Badge, PageHeader, Table, inr, useCan } from "../components/kit";
@@ -46,6 +47,7 @@ export function SettingsPage() {
           </p>
         </Panel>
       </div>
+      {isOwner && <ChangeRequests />}
       {isOwner && <ReceivingAccounts />}
       <FreeModelScout />
       <Panel title="Model keys">

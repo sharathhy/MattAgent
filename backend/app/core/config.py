@@ -66,6 +66,11 @@ class Settings(BaseSettings):
     #: the hosting environment. MATT is receive-only: it never sends or debits money.
     upi_id: str | None = None
     upi_payee_name: str = "MATT"
+    #: Change requests: MATT opens pull requests on its own repository with this fine-grained
+    #: token (this repository only; Contents + Pull requests). It never merges.
+    github_token: str | None = None
+    github_repo: str = "sharathhy/MattAgent"
+    github_base_branch: str = "claude/matt-foundation-cnz4ei"
     #: Business timezone: decides what "today" means for revenue.
     timezone: str = "Asia/Kolkata"
 
@@ -87,6 +92,7 @@ class Settings(BaseSettings):
         "cerebras_api_key",
         "mistral_api_key",
         "upi_id",
+        "github_token",
         "ollama_url",
         "anthropic_api_key",
         mode="before",

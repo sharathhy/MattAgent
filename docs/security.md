@@ -87,3 +87,12 @@ its own, inside these guardrails that no approval can lift:
   provider key, an owner on/off switch, a low daily cap, STOP handling and a suppression list.
 - Skills run their own experiments with free tools only. They cannot send, publish, sign up for
   services or move money. An idea that needs money waits for the owner, who funds it personally.
+
+## Changing MATT's own code
+
+Only the owner can request a change (Settings or voice). Drafting reads repository files as
+untrusted data. Every change waits for the owner's approval (high risk) with the plan and exact
+diff shown. After approval MATT opens a pull request from a new branch based on the commit it
+drafted against; it never pushes to the deploy branch and never merges. CI, deployment
+(`render.yaml`, `Dockerfile`), lock files and secret files are refused. The GitHub token is a
+fine-grained token for this repository only, set in the hosting environment.
