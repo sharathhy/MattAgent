@@ -35,9 +35,7 @@ def upgrade() -> None:
     )
     with op.batch_alter_table("experiments") as batch:
         batch.add_column(sa.Column("agent_slug", sa.String(length=100), nullable=True))
-        batch.add_column(
-            sa.Column("steps_done", sa.Integer(), nullable=False, server_default="0")
-        )
+        batch.add_column(sa.Column("steps_done", sa.Integer(), nullable=False, server_default="0"))
         batch.create_index(batch.f("ix_experiments_agent_slug"), ["agent_slug"])
 
 
