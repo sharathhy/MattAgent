@@ -1,5 +1,7 @@
 import type {
+  AiTest,
   AutopilotStatus,
+  Diagnostics,
   ChangeConfig,
   ChangeRequest,
   AgentDetail,
@@ -125,6 +127,8 @@ export const api = {
   updateAutopilot: (body: Partial<Pick<AutopilotStatus, "enabled" | "cities" | "categories" | "interval_minutes" | "daily_outreach_drafts">>) =>
     send<AutopilotStatus>("PUT", "/autopilot", body),
   runAutopilot: () => post<Task | null>("/autopilot/run", {}),
+  diagnostics: () => request<Diagnostics>("/diagnostics"),
+  testAi: () => post<AiTest[]>("/diagnostics/test-ai", {}),
   paymentConfig: () => request<PaymentConfig>("/payments/config"),
   paymentRequests: () => request<PaymentRequest[]>("/payments"),
   requestPayment: (body: { amount_inr: number; purpose: string; category: string }) =>

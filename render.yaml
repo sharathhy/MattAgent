@@ -47,12 +47,6 @@ services:
       # requests: read and write). MATT opens pull requests with it after you approve; never merges.
       - key: MATT_GITHUB_TOKEN
         sync: false
-      # Optional: Claude, used ONLY to draft "Change MATT" code changes, never for business work.
-      # Claude stays off unless both are set; at the monthly cap MATT drafts with the free model.
-      - key: MATT_ANTHROPIC_API_KEY
-        sync: false
-      - key: MATT_CODE_AI_MONTHLY_BUDGET_INR
-        value: "0"
       - key: MATT_FREE_MODELS_ONLY
         value: "true"
       - key: MATT_DAILY_AI_BUDGET_INR

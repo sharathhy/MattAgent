@@ -20,7 +20,16 @@ from app.schemas.ops import (
     WorkflowInfo,
     WorkflowRunRequest,
 )
-from app.services import approvals, autopilot, command, dashboard, events, model_scout, tasks
+from app.services import (
+    approvals,
+    autopilot,
+    command,
+    dashboard,
+    diagnostics,
+    events,
+    model_scout,
+    tasks,
+)
 from app.workflows import WORKFLOWS
 
 router = APIRouter(tags=["operations"])
@@ -192,6 +201,18 @@ def update_autopilot(
 def run_autopilot_now(db: DbSession, _: Admin, model_router: Router) -> TaskOut | None:
     task = autopilot.tick(db, model_router, force=True)
     return _task_out(task) if task else None
+
+
+@router.get("/diagnostics")
+def get_diagnostics(db: DbSession, _: Admin, model_router: Router) -> dict[str, Any]:
+    """Why the bots are or aren't working, with the fix for each problem."""
+    return diagnostics.report(db, model_router)
+
+
+@router.post("/diagnostics/test-ai")
+def test_ai(_: Admin, model_router: Router) -> list[dict[str, Any]]:
+    """Ping every connected free AI model now and report what each one says."""
+    return diagnostics.test_models(model_router)
 
 
 @router.get("/models/free-sources")

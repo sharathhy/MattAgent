@@ -485,7 +485,6 @@ export interface ChangeRequest {
   error: string | null;
   model: string | null;
   approval_id: number | null;
-  cost_inr: number;
   created_at: string;
 }
 
@@ -494,14 +493,32 @@ export interface ChangeConfig {
   repo: string;
   base_branch: string;
   free_models_only: boolean;
-  code_ai: CodeAiStatus;
 }
 
-/** Claude is used only for drafting Change MATT code, inside the owner's cap. */
-export interface CodeAiStatus {
-  provider: "claude" | "free";
-  model: string | null;
-  monthly_cap_inr: number;
-  spent_30d_inr: number;
-  scope: string;
+/** Self-diagnosis: why bots are or aren't working, each problem with its fix. */
+export interface Diagnostics {
+  checked_at: string;
+  healthy: boolean;
+  problems: { level: "error" | "warn" | "info"; text: string; fix: string }[];
+  worker: {
+    enabled: boolean; last_heartbeat_at: string | null; threads: number; queued: number;
+    oldest_queued_at: string | null; running: number; failed_24h: number;
+  };
+  models: { provider: string; calls_24h: number; failures_24h: number; last_success_at: string | null; last_error: string | null }[];
+  ai_answers_last_hour: number;
+  autopilot_enabled: boolean;
+  bots: {
+    task_id: number; agent: string; provider: string | null; status: TaskStatus; attempts: number;
+    result: string | null; error: string | null; created_at: string;
+  }[];
+  ready_for_you: { id: number; name: string; agent_slug: string | null; next_step: string | null }[];
+}
+
+export interface AiTest {
+  provider: string;
+  model: string;
+  ok: boolean;
+  reply?: string;
+  latency_ms?: number;
+  error?: string;
 }

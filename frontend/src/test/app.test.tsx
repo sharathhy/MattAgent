@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -304,14 +304,15 @@ describe("working pages", () => {
         model_keys: { MATT_GEMINI_API_KEY: true }, free_models_only: true, allow_premium_models: false,
         daily_ai_budget_inr: 0, monthly_ai_budget_inr: 0, worker_enabled: true, email_sending: false,
       },
-      "/changes/config": {
-        github_connected: false, repo: "sharathhy/MattAgent", base_branch: "main", free_models_only: true,
-        code_ai: { provider: "claude", model: "claude-opus-5-5", monthly_cap_inr: 500, spent_30d_inr: 42.5,
-          scope: "Claude is used only to draft Change MATT code changes, never for business work." },
+      "/changes/config": { github_connected: false, repo: "sharathhy/MattAgent", base_branch: "main", free_models_only: true },
+      "/diagnostics": {
+        checked_at: "2026-10-08T10:00:00Z", healthy: false,
+        problems: [{ level: "error", text: "gemini: 3 of 3 calls failed in 24 hours. Latest error: gemini HTTP 429", fix: "A 429 means the free daily limit is used up" }],
+        worker: { enabled: true, last_heartbeat_at: "2026-10-08T10:00:00Z", threads: 4, queued: 2, oldest_queued_at: null, running: 1, failed_24h: 3 },
+        models: [{ provider: "gemini", calls_24h: 3, failures_24h: 3, last_success_at: null, last_error: "gemini HTTP 429" }],
+        ai_answers_last_hour: 0, autopilot_enabled: true, bots: [], ready_for_you: [],
       },
-      "/changes": [{ id: 1, request: "Add a CSV export", status: "awaiting_approval", plan: "PLAN: export", files: [],
-        diff: null, branch: null, pr_url: null, error: null, model: "claude-opus-5-5", approval_id: 2, cost_inr: 3.25,
-        created_at: "2026-10-08T10:00:00Z" }],
+      "/changes": [],
       "/payments/accounts": [{ id: 1, kind: "bank", label: "Main", holder_name: "Test Owner", bank_name: "Test Bank",
         ifsc: "ABCD0123456", masked: "•••• 9012", is_primary: true, updated_at: "2026-10-08T00:00:00Z" }],
       "/models/free-sources": [
@@ -331,8 +332,7 @@ describe("working pages", () => {
     expect(await screen.findByText("•••• 9012")).toBeInTheDocument();
     expect(screen.getByText("Where you get paid")).toBeInTheDocument();
     expect(await screen.findByText(/Add MATT_GITHUB_TOKEN in Render/)).toBeInTheDocument();
-    expect(screen.getByText(/₹42\.50 of your ₹500\.00 cap/)).toBeInTheDocument();
-    fireEvent.click(await screen.findByRole("button", { name: "Show plan and code" }));
-    expect(screen.getByText(/AI cost ₹3\.25/)).toBeInTheDocument();
+    expect(await screen.findByText(/Something is stopping the bots/)).toBeInTheDocument();
+    expect(screen.getByText(/Fix: A 429 means/)).toBeInTheDocument();
   });
 });
