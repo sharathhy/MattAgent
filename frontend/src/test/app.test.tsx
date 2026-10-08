@@ -280,6 +280,8 @@ describe("working pages", () => {
         model_keys: { MATT_GEMINI_API_KEY: true }, free_models_only: true, allow_premium_models: false,
         daily_ai_budget_inr: 0, monthly_ai_budget_inr: 0, worker_enabled: true, email_sending: false,
       },
+      "/payments/accounts": [{ id: 1, kind: "bank", label: "Main", holder_name: "Test Owner", bank_name: "Test Bank",
+        ifsc: "ABCD0123456", masked: "•••• 9012", is_primary: true, updated_at: "2026-10-08T00:00:00Z" }],
       "/models/free-sources": [
         { slug: "gemini", name: "Google Gemini (AI Studio)", env_var: "MATT_GEMINI_API_KEY", signup_url: "https://aistudio.google.com/apikey",
           free_limits: "Free tier", note: "", recommended: true, connected: true, model: "gemini-3.8-flash", status: "ok",
@@ -294,5 +296,7 @@ describe("working pages", () => {
     expect(screen.getByText("(1 failed)")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Get a free key" })).toHaveAttribute("href", "https://console.groq.com/keys");
     expect(screen.getByRole("button", { name: "Scan now" })).toBeInTheDocument();
+    expect(await screen.findByText("•••• 9012")).toBeInTheDocument();
+    expect(screen.getByText("Where you get paid")).toBeInTheDocument();
   });
 });

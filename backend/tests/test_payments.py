@@ -48,7 +48,7 @@ def test_payment_request_needs_upi_id(client: TestClient, owner_headers: dict[st
     r = client.post(
         "/api/payments", headers=owner_headers, json={"amount_inr": "5000", "purpose": "Website"}
     )
-    assert r.status_code == 400 and "MATT_UPI_ID" in r.json()["detail"]
+    assert r.status_code == 400 and "Settings" in r.json()["detail"]
 
 
 def test_request_then_owner_confirms_receipt(
@@ -85,7 +85,7 @@ def test_request_then_owner_confirms_receipt(
 
 def test_bad_upi_id_and_amount_limits(settings: Settings, db: Session) -> None:
     settings.upi_id = "9999999999"  # a bare phone number is not a UPI ID
-    assert payments.config(settings)["problem"] == "MATT_UPI_ID is not a valid UPI ID"
+    assert payments.config(db, settings)["problem"] == "MATT_UPI_ID is not a valid UPI ID"
     settings.upi_id = UPI
     from decimal import Decimal
 
@@ -99,3 +99,50 @@ def test_bad_upi_id_and_amount_limits(settings: Settings, db: Session) -> None:
         raise AssertionError("must refuse")
     except ServiceError as exc:
         assert "between" in str(exc)
+
+
+def test_owner_adds_bank_and_upi_encrypted_masked_and_audited(
+    client: TestClient, owner_headers: dict[str, str], admin_headers: dict[str, str], db: Session
+) -> None:
+    from sqlalchemy import select
+
+    from app.models import AuditLog, ReceivingAccount
+
+    bank = {"kind": "bank", "label": "Main", "holder_name": "Test Owner", "bank_name": "Test Bank",
+            "number": "1234 5678 9012", "ifsc": "abcd0123456"}  # fmt: skip
+    assert (
+        client.post("/api/payments/accounts", json=bank, headers=admin_headers).status_code == 403
+    )
+    r = client.post("/api/payments/accounts", json=bank, headers=owner_headers)
+    assert r.status_code == 201
+    row = r.json()
+    assert row["masked"] == "•••• 9012" and row["ifsc"] == "ABCD0123456" and row["is_primary"]
+    assert "123456789012" not in r.text
+    stored = db.scalars(select(ReceivingAccount)).one()
+    assert "123456789012" not in stored.secret_enc  # encrypted at rest
+    bad = dict(bank, ifsc="12345")
+    assert client.post("/api/payments/accounts", json=bad, headers=owner_headers).status_code == 400
+    upi = {
+        "kind": "upi",
+        "label": "PhonePe",
+        "holder_name": "Test Owner",
+        "number": "owner.test@ybl",
+    }
+    assert client.post("/api/payments/accounts", json=upi, headers=owner_headers).status_code == 201
+    actions = [a.action for a in db.scalars(select(AuditLog)).all()]
+    assert actions.count("receiving_account.added") == 2
+    assert client.get("/api/payments/accounts", headers=admin_headers).status_code == 403
+
+    # Payment requests now use the saved UPI ID and print the bank details for the customer.
+    config = client.get("/api/payments/config", headers=owner_headers).json()
+    assert (
+        config["configured"] and config["upi_id"] == UPI and config["bank"]["number"] == "•••• 9012"
+    )
+    req = client.post("/api/payments", headers=owner_headers,
+                      json={"amount_inr": "5000", "purpose": "Logo design"}).json()  # fmt: skip
+    assert req["upi_link"].startswith("upi://pay?pa=owner.test%40ybl")
+    assert req["bank"]["number"] == "123456789012" and req["bank"]["ifsc"] == "ABCD0123456"
+    acct_id = row["id"]
+    assert (
+        client.delete(f"/api/payments/accounts/{acct_id}", headers=owner_headers).status_code == 204
+    )

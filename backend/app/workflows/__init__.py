@@ -156,8 +156,28 @@ def audit_url(ctx: Context, params: dict[str, Any]) -> dict[str, Any]:
     return audit
 
 
+_HYPE = re.compile(
+    r"\b(guarantee[ds]?|100\s?%|risk[- ]free|act now|limited time|last chance|no[. ]?1|#1|"
+    r"double your|overnight)\b",
+    re.I,
+)
+
+
+def compliance_problems(draft: str) -> list[str]:
+    """Anti-spam checks every outreach draft must pass (applied with or without approvals)."""
+    problems = []
+    if not re.search(r"\bSTOP\b|unsubscribe|opt[- ]?out", draft, re.I):
+        problems.append("no opt-out line")
+    if not re.search(r"^\s*Subject:", draft, re.I | re.M):
+        problems.append("no subject line")
+    if hype := _HYPE.findall(draft):
+        problems.append("hype or false-urgency wording: " + ", ".join(sorted(set(hype))))
+    return problems
+
+
 def draft_outreach(ctx: Context, params: dict[str, Any]) -> dict[str, Any]:
-    """Draft a compliant outreach message for a lead and queue it for owner approval."""
+    """Draft a compliant outreach message for a lead. It is not money, so it needs no approval,
+    but it must pass the anti-spam checks; MATT has no email provider, so nothing is sent."""
     lead = ctx.db.get(Lead, int(params.get("lead_id", 0)))
     if lead is None:
         raise NotFoundError("Lead not found")
@@ -179,19 +199,24 @@ def draft_outreach(ctx: Context, params: dict[str, Any]) -> dict[str, Any]:
                          context=context, task_id=ctx.task_id,
                          override_budget=ctx.override_budget)  # fmt: skip
     lead.outreach_draft = result.text
-    b.outreach_status = "awaiting_approval"
-    approval = Approval(
-        task_id=ctx.task_id, agent_slug="sales-copywriter", kind="outreach",
-        action=f"Send outreach email to {b.name}",
-        details={"lead_id": lead.id, "to": b.public_email, "draft": result.text},
-        risk_level=RiskLevel.HIGH, status=ApprovalStatus.PENDING,
-    )  # fmt: skip
-    ctx.db.add(approval)
-    ctx.db.flush()
-    events.emit(ctx.db, "approval.requested", approval_id=approval.id, action=approval.action)
+    problems = compliance_problems(result.text)
+    if problems:
+        b.outreach_status = "needs_fix"
+        lead.next_action = "Draft failed the anti-spam check (" + "; ".join(problems) + ")"
+    else:
+        b.outreach_status = "ready"
+        lead.next_action = (
+            "Draft ready. Send it from your own email: MATT has no email provider connected, "
+            "so it sends nothing. One message per business; honour any STOP reply."
+        )
+    events.emit(ctx.db, "outreach.drafted", lead_id=lead.id, status=b.outreach_status)
     ctx.db.commit()
-    return {"summary": f"Outreach draft for {b.name} is waiting for your approval.",
-            "approval_id": approval.id, "draft": result.text}  # fmt: skip
+    summary = (
+        f"Outreach draft for {b.name} is ready for you to send."
+        if not problems
+        else f"Outreach draft for {b.name} failed the anti-spam check: {'; '.join(problems)}."
+    )
+    return {"summary": summary, "draft": result.text, "compliance": problems or "passed"}
 
 
 _JSON_BLOCK = re.compile(r"\[.*\]", re.S)
@@ -345,13 +370,13 @@ WORKFLOWS["daily_report"] = (
 )
 
 
-def skill_bot(ctx: Context, params: dict[str, Any]) -> dict[str, Any]:
-    """One skill works on its own: it produces one useful work product in its own field from
-    MATT's real records and saves it to memory. It never contacts anyone, spends or publishes."""
-    from app.models import Knowledge
+_JSON_OBJECT = re.compile(r"\{.*\}", re.S)
+MAX_EXPERIMENT_STEPS = 3
+
+
+def _bot_facts(ctx: Context, agent: Agent) -> dict[str, Any]:
     from app.services import earnings
 
-    agent = _agent(ctx.db, str(params["agent_slug"]))
     e = earnings.summary(ctx.db, ctx.router.settings.timezone, days=1)
     leads = ctx.db.scalars(
         select(Lead)
@@ -359,7 +384,7 @@ def skill_bot(ctx: Context, params: dict[str, Any]) -> dict[str, Any]:
         .order_by(Business.opportunity_score.desc().nulls_last())
         .limit(5)
     ).all()
-    facts = {
+    return {
         "revenue_today_inr": e["today_inr"],
         "revenue_month_inr": e["month_inr"],
         "top_leads": [
@@ -371,32 +396,126 @@ def skill_bot(ctx: Context, params: dict[str, Any]) -> dict[str, Any]:
             f"{o.title} ({o.score:.0f}, estimate)"
             for o in ctx.db.scalars(select(Opportunity).order_by(Opportunity.score.desc()).limit(3))
         ],
+        "your_skills": agent.capabilities,
         "your_outputs": agent.outputs,
     }
-    ctx.emit("workflow.step", step="bot", message=f"{agent.name} is working on its own")
+
+
+BOT_LIMITS = (
+    "Limits: you work only inside MATT. You cannot send messages, publish, sign up for services "
+    "or move money; the owner does those. Money only ever comes IN, to the owner's own account. "
+    "Use free tools only. Never invent facts or results; label claims FACT, ESTIMATE, "
+    "PREDICTION, ASSUMPTION or RECOMMENDATION."
+)
+
+
+def skill_bot(ctx: Context, params: dict[str, Any]) -> dict[str, Any]:
+    """One skill works on its own money-making idea.
+
+    With no experiment running, the skill proposes one (a small, legal way to earn money online
+    in its field) and records it. Ideas that cost nothing start straight away; any idea that
+    needs money waits for the owner in Approvals, the only thing that does. With an experiment
+    running, the skill does its next concrete step and saves the work to memory. After a few
+    steps it hands the owner what they must do to earn the first rupee. Results count only when
+    real revenue is recorded."""
+    from decimal import Decimal, InvalidOperation
+
+    from app.models import Experiment, Knowledge
+
+    agent = _agent(ctx.db, str(params["agent_slug"]))
+    facts = _bot_facts(ctx, agent)
+    running = ctx.db.scalar(
+        select(Experiment).where(
+            Experiment.agent_slug == agent.slug, Experiment.status == "running"
+        )
+    )
+    if running is None:
+        ctx.emit("workflow.step", step="bot", message=f"{agent.name} is proposing its own idea")
+        result = runtime.run(
+            ctx.db, ctx.router, agent,
+            "Propose ONE small, legal experiment in your own field to earn money online for MATT's "
+            "owner in India, that you can mostly prepare yourself. Return ONLY a JSON object: "
+            '{"name", "hypothesis", "target" (who pays), "plan" (3 short steps you can do), '
+            '"needs_money" (true only if it requires spending), "cost_inr" (0 if free), '
+            '"expected" (ESTIMATE of revenue and how it is reached)}. ' + BOT_LIMITS,
+            context=facts, task_id=ctx.task_id, override_budget=ctx.override_budget, max_tokens=700,
+        )  # fmt: skip
+        match = _JSON_OBJECT.search(result.text)
+        try:
+            idea = json.loads(match.group(0)) if match else None
+        except json.JSONDecodeError:
+            idea = None
+        if not isinstance(idea, dict) or not idea.get("name"):
+            raise ServiceError(f"{agent.name} did not return an idea in the expected format")
+        try:
+            cost = max(Decimal(str(idea.get("cost_inr") or 0)), Decimal("0"))
+        except InvalidOperation:
+            cost = Decimal("0")
+        needs_money = bool(idea.get("needs_money")) or cost > 0
+        plan = idea.get("plan") or []
+        exp = Experiment(
+            name=str(idea["name"])[:300], hypothesis=str(idea.get("hypothesis", ""))[:5000],
+            target=str(idea.get("target") or "")[:300] or None,
+            expected="ESTIMATE: " + str(idea.get("expected") or "unknown")[:4900],
+            budget_inr=cost, agent_slug=agent.slug, steps_done=0,
+            status="planned" if needs_money else "running",
+            decision=("Plan: " + " | ".join(str(p) for p in plan)[:4000]) if plan else None,
+        )  # fmt: skip
+        ctx.db.add(exp)
+        ctx.db.flush()
+        if needs_money:
+            approval = Approval(
+                task_id=ctx.task_id, agent_slug=agent.slug, kind="investment",
+                action=f"Invest ₹{cost:,.0f} in '{exp.name}' (proposed by {agent.name})",
+                details={"experiment_id": exp.id, "hypothesis": exp.hypothesis,
+                         "expected": exp.expected, "plan": plan,
+                         "note": "MATT never pays. If you approve, you fund it yourself."},
+                estimated_cost_inr=cost, risk_level=RiskLevel.HIGH, status=ApprovalStatus.PENDING,
+            )  # fmt: skip
+            ctx.db.add(approval)
+            events.emit(ctx.db, "approval.requested", action=approval.action)
+        events.emit(ctx.db, "experiment.proposed", agent=agent.slug, name=exp.name,
+                    needs_money=needs_money)  # fmt: skip
+        ctx.db.commit()
+        verdict = "waits for your approval (it needs money)" if needs_money else "is running"
+        return {"summary": f"{agent.name} proposed '{exp.name}', which {verdict}.",
+                "experiment_id": exp.id}  # fmt: skip
+
+    step = running.steps_done + 1
+    ctx.emit("workflow.step", step="bot", message=f"{agent.name}: step {step} of '{running.name}'")
     result = runtime.run(
         ctx.db, ctx.router, agent,
-        "Work on your own: produce ONE concrete, useful work product in your field that helps "
-        "MATT win or serve its next paying customer (for example a checklist, a short plan, a "
-        "draft, or an analysis of the leads below). Use only these facts; label each claim FACT, "
-        "ESTIMATE, PREDICTION, ASSUMPTION or RECOMMENDATION. Do not contact anyone, spend money "
-        "or publish anything; say what would need the owner's approval instead.",
-        context=facts, task_id=ctx.task_id, override_budget=ctx.override_budget, max_tokens=700,
+        f"You are running your experiment '{running.name}'. Hypothesis: {running.hypothesis}. "
+        f"{running.decision or ''} Do step {step} now and produce the actual work product (copy, "
+        "offer, list, plan or draft), not a description of it. End with one line: "
+        "'NEXT: <your next step>' or, if it is ready, 'OWNER: <exactly what the owner must do "
+        "to earn the first rupee>'. " + BOT_LIMITS,
+        context=facts, task_id=ctx.task_id, override_budget=ctx.override_budget, max_tokens=900,
     )  # fmt: skip
     note = Knowledge(
-        kind="agent", title=f"{agent.name}: work product", content=result.text,
-        tags=["skill-bot", "autopilot", agent.department], agent_slug=agent.slug,
+        kind="agent", title=f"{agent.name}: {running.name} (step {step})", content=result.text,
+        tags=["skill-bot", "experiment", agent.department], agent_slug=agent.slug,
         source="autopilot",
     )  # fmt: skip
     ctx.db.add(note)
+    running.steps_done = step
+    handoff = re.search(r"^\s*OWNER:\s*(.+)$", result.text, re.M)
+    if handoff or step >= MAX_EXPERIMENT_STEPS:
+        running.status = "completed"
+        running.result = (
+            "Prepared by the skill; no revenue counts until you record a real payment. "
+            + (f"Your next step: {handoff.group(1).strip()}" if handoff else "See the last step.")
+        )[:5000]
+    ctx.db.flush()
+    events.emit(ctx.db, "experiment.step", agent=agent.slug, name=running.name, step=step)
     ctx.db.commit()
-    ctx.emit("bot.output", knowledge_id=note.id, agent=agent.slug)
     first = next((ln.strip() for ln in result.text.splitlines() if ln.strip()), "Done")
-    return {"summary": first[:300], "knowledge_id": note.id, "agent": agent.slug}
+    return {"summary": f"Step {step} of '{running.name}': {first}"[:300],
+            "knowledge_id": note.id, "experiment_id": running.id}  # fmt: skip
 
 
 WORKFLOWS["skill_bot"] = (
-    "Let one skill work on its own and save its work product to memory (AI model needed).",
+    "Let one skill propose or advance its own money-making experiment (AI model needed).",
     skill_bot,
     True,
 )

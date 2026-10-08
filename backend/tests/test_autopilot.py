@@ -81,7 +81,7 @@ def test_cycles_without_ai_report_then_discover(
     assert {"autopilot.cycle", "report.ready"} <= events
 
 
-def test_with_ai_it_drafts_outreach_for_approval_and_never_sends(
+def test_with_ai_it_drafts_outreach_and_never_sends(
     client: TestClient,
     owner_headers: dict[str, str],
     seeded: None,
@@ -110,12 +110,17 @@ def test_with_ai_it_drafts_outreach_for_approval_and_never_sends(
         "website_opportunities",
         "draft_outreach",
     ]
-    approvals = client.get("/api/approvals?status=pending", headers=owner_headers).json()
-    assert len(approvals) == 1 and approvals[0]["kind"] == "outreach"
+    # Outreach is not money, so it needs no approval; MATT never sends it.
+    assert client.get("/api/approvals?status=pending", headers=owner_headers).json() == []
+    statuses = [
+        ld["business"]["outreach_status"]
+        for ld in client.get("/api/leads", headers=owner_headers).json()
+    ]
+    assert "ready" in statuses
     assert all(
         t.status != "failed"
         for t in db.query(Task).all()
-        if t.input.get("workflow") != "opportunity_research"
+        if t.input.get("workflow") not in ("opportunity_research", "skill_bot")
     )
 
 
@@ -149,36 +154,82 @@ def test_each_cycle_gives_a_skill_its_own_turn(
     client: TestClient,
     owner_headers: dict[str, str],
     seeded: None,
-    offline: None,
     settings: Settings,
     db: Session,
 ) -> None:
-    from sqlalchemy import select
-
-    from app.models import Knowledge
-
-    provider = free(["RECOMMENDATION: call the top lead after approval."])
-    client.app.state.model_router = ModelRouter(settings, providers=[provider])  # type: ignore[attr-defined]
+    client.app.state.model_router = ModelRouter(settings, providers=[free()])  # type: ignore[attr-defined]
     router = _router(client)
     autopilot.tick(db, router, force=True)
     bots = [t for t in db.query(Task).all() if t.input.get("workflow") == "skill_bot"]
     assert len(bots) == 1 and bots[0].created_by == "autopilot"
-    drain(db, router)
-    db.refresh(bots[0])
-    assert bots[0].status == "succeeded"
-    note = db.scalars(select(Knowledge).where(Knowledge.kind == "agent")).one()
-    assert (
-        note.agent_slug == bots[0].input["params"]["agent_slug"]
-        and "RECOMMENDATION" in note.content
-    )
     status = client.get("/api/autopilot", headers=owner_headers).json()
     assert status["bots_today"] == 1 and status["last_tick_at"] and status["free_models_only"]
-
     row = autopilot.get(db)
     row.daily_bot_tasks = 1
     db.commit()
     autopilot.tick(db, router, force=True)
     assert len([t for t in db.query(Task).all() if t.input.get("workflow") == "skill_bot"]) == 1
+
+
+IDEA = (
+    '{"name": "Clinic website audit pack", "hypothesis": "Clinics pay for a quick fix list", '
+    '"target": "dental clinics in Mysuru", "plan": ["write offer", "draft audit template", '
+    '"prepare outreach"], "needs_money": false, "cost_inr": 0, '
+    '"expected": "2 sales of 3,000 INR in a month"}'
+)
+
+
+def test_skill_proposes_runs_and_hands_off_its_own_idea(
+    seeded: None, owner_headers: dict[str, str], settings: Settings, db: Session
+) -> None:
+    from app.models import Approval, Experiment, Knowledge
+    from app.workflows import Context, run_workflow
+
+    handoff = "Template: ...\nOWNER: post the offer in two local clinic groups"
+    provider = free([IDEA, "Offer: ...\nNEXT: draft the template", handoff])
+    ctx = Context(db=db, router=ModelRouter(settings, providers=[provider]))
+    params = {"agent_slug": "sales-copywriter"}
+    out = run_workflow(ctx, "skill_bot", params)
+    exp = db.get(Experiment, out["experiment_id"])
+    assert exp and exp.status == "running" and exp.agent_slug == "sales-copywriter"
+    assert exp.expected and exp.expected.startswith("ESTIMATE")
+    assert not db.query(Approval).all()  # free idea: no approval needed
+    run_workflow(ctx, "skill_bot", params)
+    run_workflow(ctx, "skill_bot", params)
+    db.refresh(exp)
+    assert exp.status == "completed" and exp.steps_done == 2
+    assert exp.result and "post the offer" in exp.result and "no revenue counts" in exp.result
+    assert len(db.query(Knowledge).filter(Knowledge.kind == "agent").all()) == 2
+
+
+def test_ideas_that_need_money_wait_for_the_owner(
+    client: TestClient,
+    owner_headers: dict[str, str],
+    admin_headers: dict[str, str],
+    seeded: None,
+    settings: Settings,
+    db: Session,
+) -> None:
+    from app.models import Experiment
+    from app.workflows import Context, run_workflow
+
+    idea = IDEA.replace(
+        '"needs_money": false, "cost_inr": 0', '"needs_money": true, "cost_inr": 2000'
+    )
+    ctx = Context(db=db, router=ModelRouter(settings, providers=[free([idea])]))
+    exp_id = run_workflow(ctx, "skill_bot", {"agent_slug": "sales-copywriter"})["experiment_id"]
+    assert db.get(Experiment, exp_id).status == "planned"  # type: ignore[union-attr]
+    pending = client.get("/api/approvals?status=pending", headers=owner_headers).json()
+    assert len(pending) == 1 and pending[0]["kind"] == "investment"
+    assert pending[0]["risk_level"] == "high" and "₹2,000" in pending[0]["action"]
+    url = f"/api/approvals/{pending[0]['id']}/decide"
+    assert client.post(url, json={"approve": True}, headers=admin_headers).status_code == 403
+    assert client.post(url, json={"approve": True}, headers=owner_headers).json()["status"] == (
+        "approved"
+    )
+    db.expire_all()
+    exp = db.get(Experiment, exp_id)
+    assert exp and exp.status == "running" and "MATT never pays" in (exp.decision or "")
 
 
 def test_no_bots_without_a_model_and_heartbeat_when_idle(

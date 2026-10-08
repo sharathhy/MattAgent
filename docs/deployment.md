@@ -49,7 +49,9 @@ skill-bot turns a day, one at a time.
 
 ### Getting paid (UPI, receive-only)
 
-Set `MATT_UPI_ID` in Render to your own UPI ID: in PhonePe, open your profile and copy the UPI ID
+Add where you get paid in Settings, "Where you get paid" (owner only): a bank account (holder,
+bank, account number, IFSC) and/or a UPI ID. They are encrypted and shown masked. Alternatively
+set `MATT_UPI_ID` in Render to your own UPI ID: in PhonePe, open your profile and copy the UPI ID
 shown there (it looks like `name@ybl` or `number@axl`; a bare phone number is not a UPI ID).
 Optionally set `MATT_UPI_PAYEE_NAME` to the name customers should see. Then Revenue, Get paid
 by UPI creates a payment request with a QR code and link that pays you directly. When the money

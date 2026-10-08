@@ -279,6 +279,8 @@ export interface Experiment extends Row {
   result: string | null;
   decision: string | null;
   status: string;
+  agent_slug: string | null;
+  steps_done: number;
 }
 
 export interface Knowledge extends Row {
@@ -416,6 +418,7 @@ export interface FreeModelSource {
   checked_at: string | null;
   calls_24h: number;
   failures_24h: number;
+  suggested: boolean;
 }
 
 export interface PaymentConfig {
@@ -426,6 +429,27 @@ export interface PaymentConfig {
   payee_name: string;
   problem: string | null;
   verification: string;
+  bank: BankDetails | null;
+}
+
+export interface BankDetails {
+  holder_name: string;
+  bank_name: string | null;
+  ifsc: string | null;
+  number: string;
+  label: string;
+}
+
+export interface ReceivingAccount {
+  id: number;
+  kind: "bank" | "upi";
+  label: string;
+  holder_name: string;
+  bank_name: string | null;
+  ifsc: string | null;
+  masked: string;
+  is_primary: boolean;
+  updated_at: string;
 }
 
 export interface PaymentRequest {
@@ -436,9 +460,10 @@ export interface PaymentRequest {
   customer_id: number | null;
   category: string;
   status: "requested" | "received" | "cancelled";
-  upi_id: string;
-  upi_link: string;
-  qr_svg: string;
+  upi_id: string | null;
+  upi_link: string | null;
+  qr_svg: string | null;
+  bank: BankDetails | null;
   ledger_entry_id: number | null;
   created_at: string;
   received_at: string | null;

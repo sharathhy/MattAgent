@@ -93,6 +93,9 @@ class Experiment(TimestampMixin, Base):
     result: Mapped[str | None] = mapped_column(Text)
     decision: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(20), index=True)
+    #: Set when a skill bot proposed and runs this experiment itself.
+    agent_slug: Mapped[str | None] = mapped_column(String(100), index=True)
+    steps_done: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
 
 class Customer(TimestampMixin, Base):
@@ -171,3 +174,21 @@ class PaymentRequest(TimestampMixin, Base):
     ledger_entry_id: Mapped[int | None] = mapped_column(ForeignKey("ledger_entries.id"))
     created_by: Mapped[str] = mapped_column(String(100))
     received_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ReceivingAccount(TimestampMixin, Base):
+    """Where customers pay the owner: a bank account or UPI ID. Receive-only; the account
+    number or UPI ID is stored encrypted and shown masked."""
+
+    __tablename__ = "receiving_accounts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    kind: Mapped[str] = mapped_column(String(10))  # bank | upi
+    label: Mapped[str] = mapped_column(String(100))
+    holder_name: Mapped[str] = mapped_column(String(200))
+    bank_name: Mapped[str | None] = mapped_column(String(200))
+    ifsc: Mapped[str | None] = mapped_column(String(11))
+    secret_enc: Mapped[str] = mapped_column(Text)  # account number or UPI ID, encrypted
+    last4: Mapped[str] = mapped_column(String(8))
+    is_primary: Mapped[bool] = mapped_column(default=False)
+    created_by: Mapped[str] = mapped_column(String(100))

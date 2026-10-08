@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.domain import ROLE_RANK, ApprovalStatus, RiskLevel, Role, TaskStatus
 from app.db.base import utcnow
-from app.models import Approval, Lead, Task, User
+from app.models import Approval, Experiment, Lead, Task, User
 from app.services import audit, events
 from app.services.errors import ConflictError, ForbiddenError, NotFoundError
 
@@ -55,6 +55,16 @@ def _apply(db: Session, approval: Approval, approve: bool) -> None:
                 if approve
                 else "Outreach rejected; revise or drop this lead"
             )
+    elif approval.kind == "investment":
+        exp = db.get(Experiment, int(approval.details.get("experiment_id", 0)))
+        if exp is not None and exp.status == "planned":
+            exp.status = "running" if approve else "stopped"
+            exp.decision = (
+                f"Owner approved investing ₹{approval.estimated_cost_inr:,.0f}, paid by the owner "
+                "personally; MATT never pays. " + (exp.decision or "")
+                if approve
+                else "Owner declined the investment. " + (exp.decision or "")
+            )[:5000]
     elif approval.kind == "budget" and approval.task_id:
         task = db.get(Task, approval.task_id)
         if task is not None and task.status == TaskStatus.WAITING_APPROVAL:

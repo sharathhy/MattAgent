@@ -3,11 +3,13 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { AutopilotPanel } from "../components/AutopilotPanel";
 import { FreeModelScout } from "../components/FreeModelScout";
+import { ReceivingAccounts } from "../components/ReceivingAccounts";
 import { Badge, PageHeader, Table, inr, useCan } from "../components/kit";
 import { ErrorState, Loading, Panel } from "../components/ui";
 
 export function SettingsPage() {
   const isAdmin = useCan("admin");
+  const isOwner = useCan("owner");
   const settings = useQuery({ queryKey: ["settings"], queryFn: api.settings, enabled: isAdmin });
   if (!isAdmin) return <p className="text-muted">Settings are visible to admins and the owner.</p>;
   if (settings.isPending) return <Loading />;
@@ -44,6 +46,7 @@ export function SettingsPage() {
           </p>
         </Panel>
       </div>
+      {isOwner && <ReceivingAccounts />}
       <FreeModelScout />
       <Panel title="Model keys">
         <ul className="grid gap-2 text-sm sm:grid-cols-2">

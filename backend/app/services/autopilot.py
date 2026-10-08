@@ -1,9 +1,10 @@
 """Autopilot: on a schedule the CEO picks the next most valuable action and queues it.
 
 It only does work that stays inside MATT: finding and auditing businesses, scoring
-opportunities, drafting outreach (which waits in Approvals), the daily report, and giving each
-skill its own turn as an independent bot. It never sends, spends or publishes. AI calls go to
-free-tier models only (``MATT_FREE_MODELS_ONLY``, on by default).
+opportunities, drafting outreach (anti-spam checked, never sent by MATT), the daily report, and
+giving each skill its own turn as an independent bot that proposes and runs its own experiments.
+Approvals are only asked for anything involving money. It never sends, spends or publishes.
+AI calls go to free-tier models only (``MATT_FREE_MODELS_ONLY``, on by default).
 """
 
 import itertools
@@ -118,7 +119,7 @@ def choose(db: Session, router: ModelRouter, row: Autopilot) -> tuple[str, dict[
                 return (f"Draft outreach for {lead.business.name}",
                         {"workflow": "draft_outreach", "params": {"lead_id": lead.id}},
                         "Best-scored lead with a public contact has no pitch yet; "
-                        "the draft will wait for your approval.")  # fmt: skip
+                        "the draft must pass anti-spam checks; MATT never sends it.")  # fmt: skip
         researched = _count(
             db, Task.created_by == ACTOR, Task.objective.startswith("Research"),
             Task.created_at >= datetime.now(UTC) - timedelta(days=1),

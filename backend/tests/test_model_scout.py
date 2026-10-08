@@ -50,7 +50,7 @@ def test_chat_provider_picks_strongest_general_model() -> None:
     assert p2.pick([{"id": i} for i in ids]) == "qwen3-32b"
 
 
-def test_scan_switches_models_and_asks_for_one_missing_key(
+def test_scan_switches_models_and_suggests_a_missing_key(
     monkeypatch: pytest.MonkeyPatch, settings: Settings, db: Session, owner_headers: dict[str, str]
 ) -> None:
     settings.gemini_api_key, settings.gemini_model = "g", "gemini-2.5-flash"
@@ -72,11 +72,8 @@ def test_scan_switches_models_and_asks_for_one_missing_key(
         found["openrouter"]["model"].endswith(":free") and found["openrouter"]["free_models"] == 2
     )
     assert found["groq"]["status"] == "not_connected"
-    asks = db.scalars(select(Approval).where(Approval.kind == "setup")).all()
-    assert [a.details["provider"] for a in asks] == ["groq"]  # most useful missing one, once
-    assert asks[0].risk_level == "low" and "MATT_GROQ_API_KEY" in asks[0].action
-    model_scout.scan(db, router)
-    assert len(db.scalars(select(Approval).where(Approval.kind == "setup")).all()) == 1
+    assert found["groq"]["suggested"] and not found["cerebras"]["suggested"]
+    assert not db.scalars(select(Approval)).all()  # approvals are only for money
 
 
 def test_scan_records_errors_without_failing(
@@ -91,7 +88,7 @@ def test_scan_records_errors_without_failing(
     monkeypatch.setattr(providers.httpx, "get", down)
     found = {s["slug"]: s for s in model_scout.scan(db, router)}
     assert found["groq"]["status"] == "error" and "offline" in found["groq"]["error"]
-    assert not db.scalars(select(Approval)).all()  # no owner yet, so nobody to ask
+    assert not db.scalars(select(Approval)).all()
 
 
 def test_scout_api_roles(

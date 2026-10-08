@@ -34,7 +34,12 @@ What works today:
   "remember that...", "open revenue", "what time is it". Anything else goes to the CEO agent.
 - **Receive-only money (main rule):** customers pay the owner's own UPI ID directly through a
   payment request (QR code and `upi://pay` link). MATT never sends, transfers, withdraws or
-  debits money, enforced in code; a payment counts as revenue once the owner confirms it.
+  debits money, enforced in code; a payment counts as revenue once the owner confirms it. The
+  owner adds bank and UPI details in Settings (encrypted, masked, audit-logged).
+- **Skills that run their own ideas:** on autopilot each skill proposes a small money-making
+  experiment in its field and works it step by step, saving its work to Memory. Approvals are
+  asked only when an idea needs money; everything else runs on its own within anti-spam and
+  legal guardrails.
 - **Earnings:** today, 7-day, month and total revenue from the ledger (business timezone
   `MATT_TIMEZONE`, default Asia/Kolkata), a 30-day daily series, revenue by stream, and which
   skills earned it.

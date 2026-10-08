@@ -23,8 +23,8 @@ export function FreeModelScout() {
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <p className="min-w-0 flex-1 text-xs text-muted">
           Every 6 hours the Cost Optimization skill checks each free AI service, switches to its best free model and spreads
-          work across them when one hits its daily limit. MATT can't create accounts or keys, so it asks you in Approvals
-          to add the most useful missing one. Paid models are never used. Limits are the providers' own estimates.
+          work across them when one hits its daily limit. MATT can't create accounts or keys, so it marks the most useful
+          missing one as suggested. Paid models are never used. Limits are the providers' own estimates.
         </p>
         {canScan && (
           <button type="button" className="btn bg-slate-700 text-slate-100" onClick={() => scan.mutate(undefined)} disabled={scan.isPending}>
@@ -43,6 +43,7 @@ export function FreeModelScout() {
             <tr key={s.slug} className="border-b border-line/50 align-top">
               <td className="p-3">
                 {s.name}
+                {s.suggested && <span className="ml-2"><Badge value="suggested" /></span>}
                 {s.note && <p className="mt-1 text-xs text-muted">{s.note}</p>}
               </td>
               <td className="p-3">

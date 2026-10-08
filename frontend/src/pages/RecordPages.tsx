@@ -122,7 +122,8 @@ export function ExperimentsPage() {
   return (
     <RecordsPage<Experiment>
       collection="experiments" eyebrow="Validation" title="Experiments"
-      empty="No experiments yet. Write down a hypothesis before spending time or money on it."
+      intro="Skills propose and run their own money-making experiments on autopilot. Free ones start on their own; any that needs money waits for you in Approvals. Expected results are estimates; only payments you record count."
+      empty="No experiments yet. Skills add their own once an AI key is set, or write down a hypothesis yourself."
       fields={[
         { name: "name", label: "Name", required: true },
         { name: "target", label: "Target audience" },
@@ -133,7 +134,8 @@ export function ExperimentsPage() {
       ]}
       toBody={(v) => ({ ...v, budget_inr: v.budget_inr || "0", expected: v.expected || null, target: v.target || null })}
       columns={[
-        { label: "Experiment", render: (x) => <div><div>{x.name}</div><div className="text-xs text-muted">{x.hypothesis}</div></div> },
+        { label: "Experiment", render: (x) => <div><div>{x.name}</div><div className="text-xs text-muted">{x.hypothesis}</div>{x.decision && <div className="mt-1 text-xs text-muted">{x.decision}</div>}</div> },
+        { label: "By", render: (x) => x.agent_slug ? <span className="font-mono text-xs">{x.agent_slug} · step {x.steps_done}</span> : <span className="text-muted">You</span> },
         { label: "Status", render: (x) => <Badge value={x.status} /> },
         { label: "Budget", render: (x) => inr(x.budget_inr) },
         { label: "Result", render: (x) => x.result ?? <span className="text-muted">Pending</span> },

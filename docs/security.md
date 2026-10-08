@@ -67,3 +67,23 @@ money. This is enforced in code, above the approval gates:
 - MATT cannot see the owner's UPI account, so a request becomes revenue only when the owner
   confirms the money arrived. The UPI ID is set only in the hosting environment, never in the
   repository.
+
+### Receiving accounts
+
+The owner adds bank accounts and UPI IDs in Settings, "Where you get paid" (owner only). Account
+numbers and UPI IDs are encrypted at rest with a key derived from `MATT_SECRET_KEY`, shown
+masked, and every add, change or removal is audit-logged. They are only printed on payment
+requests so customers can pay. Rotating `MATT_SECRET_KEY` makes them unreadable; re-enter them.
+
+## Approvals: only for money
+
+At the owner's instruction, Approvals are asked only for steps that involve money: investing in
+an experiment, or exceeding an AI budget (which free-only mode prevents). Everything else runs on
+its own, inside these guardrails that no approval can lift:
+
+- Outreach drafts must pass an anti-spam check (opt-out line, subject, no hype or false
+  urgency), autopilot drafts at most `daily_outreach_drafts` a day, and MATT sends nothing:
+  no email provider is connected. Sending would need a verified sending domain and an email
+  provider key, an owner on/off switch, a low daily cap, STOP handling and a suppression list.
+- Skills run their own experiments with free tools only. They cannot send, publish, sign up for
+  services or move money. An idea that needs money waits for the owner, who funds it personally.

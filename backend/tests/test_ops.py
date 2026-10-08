@@ -194,10 +194,9 @@ def test_failed_model_call_retries_with_backoff(
     assert tasks.process_next(db, _router(client)) is None  # backing off
 
 
-def test_outreach_needs_owner_approval(
+def test_outreach_needs_no_approval_but_must_pass_anti_spam(
     client: TestClient,
     owner_headers: dict[str, str],
-    admin_headers: dict[str, str],
     seeded: None,
     offline: None,
     fake: FakeProvider,
@@ -211,21 +210,21 @@ def test_outreach_needs_owner_approval(
     drain(db, _router(client))
     lead = client.get("/api/leads", headers=owner_headers).json()[0]
     fake.replies = ["Subject: Your website\n\nHello... Reply STOP and I won't contact you again."]
-    assert (
-        client.post(f"/api/leads/{lead['id']}/draft-outreach", headers=owner_headers).status_code
-        == 201
-    )
+    url = f"/api/leads/{lead['id']}/draft-outreach"
+    assert client.post(url, headers=owner_headers).status_code == 201
     drain(db, _router(client))
-    pending = client.get("/api/approvals?status=pending", headers=owner_headers).json()
-    assert len(pending) == 1 and pending[0]["risk_level"] == "high"
-    url = f"/api/approvals/{pending[0]['id']}/decide"
-    assert client.post(url, json={"approve": True}, headers=admin_headers).status_code == 403
-    r = client.post(url, json={"approve": True, "note": "ok"}, headers=owner_headers)
-    assert r.json()["status"] == "approved"
+    # Not money, so no approval; nothing is sent because no email provider is connected.
+    assert client.get("/api/approvals?status=pending", headers=owner_headers).json() == []
     lead = client.get("/api/leads", headers=owner_headers).json()[0]
-    assert lead["business"]["outreach_status"] == "approved"
+    assert lead["business"]["outreach_status"] == "ready"
     assert "no email provider" in lead["next_action"]
-    assert client.post(url, json={"approve": True}, headers=owner_headers).status_code == 409
+
+    fake.replies = ["Subject: Act now\n\nGuaranteed 100% more customers overnight!"]
+    client.post(url, headers=owner_headers)
+    drain(db, _router(client))
+    lead = client.get("/api/leads", headers=owner_headers).json()[0]
+    assert lead["business"]["outreach_status"] == "needs_fix"
+    assert "no opt-out line" in lead["next_action"] and "act now" in lead["next_action"].lower()
 
 
 def test_budget_exhaustion_parks_task_for_approval(

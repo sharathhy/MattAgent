@@ -165,6 +165,8 @@ class ExperimentOut(_Out):
     result: str | None
     decision: str | None
     status: str
+    agent_slug: str | None = None
+    steps_done: int = 0
 
 
 class KnowledgeIn(BaseModel):

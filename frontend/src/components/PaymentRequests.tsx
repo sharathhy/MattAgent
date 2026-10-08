@@ -27,12 +27,12 @@ export function PaymentRequests({ categories }: { categories: string[] }) {
   return (
     <Panel title="Get paid by UPI">
       <p className="text-xs text-muted">
-        {c?.rule ?? "MATT only receives money."} Customers pay {c?.upi_id ? <span className="font-mono text-slate-200">{c.upi_id}</span> : "your UPI ID"} directly
-        by scanning the QR or opening the link in PhonePe, GPay or any UPI app. {c?.verification}
+        {c?.rule ?? "MATT only receives money."} Customers pay {c?.upi_id ? <span className="font-mono text-slate-200">{c.upi_id}</span> : "you"} directly by scanning the
+        QR in PhonePe, GPay or any UPI app{c?.bank ? `, or by bank transfer to ${c.bank.bank_name} ${c.bank.number}` : ""}. {c?.verification}
       </p>
       {c && !c.configured && (
         <p className="mt-2 text-sm text-amber-300">
-          {c.problem ?? "Add your UPI ID as MATT_UPI_ID in Render (Environment) to start requesting payments."}
+          {c.problem ?? "Add where you get paid (bank account or UPI ID) in Settings to start requesting payments."}
         </p>
       )}
       {c?.configured && canRequest && (
@@ -80,16 +80,29 @@ export function PaymentRequests({ categories }: { categories: string[] }) {
                 )}
               </div>
               {open === p.id && (
-                <div className="mt-3 flex flex-wrap items-center gap-4">
-                  <img
-                    alt={`UPI QR code for ${p.reference}`}
-                    className="h-40 w-40 rounded bg-white p-1"
-                    src={`data:image/svg+xml;utf8,${encodeURIComponent(p.qr_svg)}`}
-                  />
+                <div className="mt-3 flex flex-wrap items-start gap-4">
+                  {p.qr_svg && p.upi_link && (
+                    <img
+                      alt={`UPI QR code for ${p.reference}`}
+                      className="h-40 w-40 rounded bg-white p-1"
+                      src={`data:image/svg+xml;utf8,${encodeURIComponent(p.qr_svg)}`}
+                    />
+                  )}
                   <div className="space-y-2 text-xs text-muted">
-                    <p>Pays <span className="font-mono text-slate-200">{p.upi_id}</span>. Created {formatDate(p.created_at)}.</p>
-                    <a className="text-accent" href={p.upi_link}>Open in a UPI app</a>
-                    <button type="button" className="ml-3 text-accent" onClick={() => void navigator.clipboard?.writeText(p.upi_link)}>Copy link</button>
+                    {p.upi_link && (
+                      <>
+                        <p>UPI: <span className="font-mono text-slate-200">{p.upi_id}</span></p>
+                        <a className="text-accent" href={p.upi_link}>Open in a UPI app</a>
+                        <button type="button" className="ml-3 text-accent" onClick={() => void navigator.clipboard?.writeText(p.upi_link ?? "")}>Copy link</button>
+                      </>
+                    )}
+                    {p.bank && (
+                      <p>
+                        Bank transfer: {p.bank.holder_name}, {p.bank.bank_name}, A/c <span className="font-mono text-slate-200">{p.bank.number}</span>,
+                        IFSC <span className="font-mono text-slate-200">{p.bank.ifsc}</span>. Reference {p.reference}.
+                      </p>
+                    )}
+                    <p>Created {formatDate(p.created_at)}.</p>
                     {p.received_at && <p>Received {formatDate(p.received_at)} and recorded as revenue.</p>}
                   </div>
                 </div>

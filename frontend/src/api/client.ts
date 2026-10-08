@@ -17,6 +17,7 @@ import type {
   Opportunity,
   PaymentConfig,
   PaymentRequest,
+  ReceivingAccount,
   RegistrySummary,
   SystemSettings,
   Task,
@@ -127,6 +128,10 @@ export const api = {
   requestPayment: (body: { amount_inr: number; purpose: string; category: string }) =>
     post<PaymentRequest>("/payments", body),
   paymentReceived: (id: number) => post<PaymentRequest>(`/payments/${id}/received`, {}),
+  receivingAccounts: () => request<ReceivingAccount[]>("/payments/accounts"),
+  addReceivingAccount: (body: Record<string, unknown>) => post<ReceivingAccount>("/payments/accounts", body),
+  makePrimaryAccount: (id: number) => post<ReceivingAccount>(`/payments/accounts/${id}/primary`, {}),
+  removeReceivingAccount: (id: number) => request<null>(`/payments/accounts/${id}`, { method: "DELETE" }),
   cancelPayment: (id: number) => post<PaymentRequest>(`/payments/${id}/cancel`, {}),
   freeSources: () => request<FreeModelSource[]>("/models/free-sources"),
   runScout: () => post<FreeModelSource[]>("/models/scout", {}),
