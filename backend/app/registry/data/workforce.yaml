@@ -1,0 +1,206 @@
+# MATT initial workforce catalog.
+#
+# This file is data, not code: adding a worker means adding an entry here (or, later, via the
+# Skill Factory). Slugs are derived from names unless given. Category defaults apply to every
+# skill in that category and can be overridden per skill.
+#
+# Tool ids are declared requirements; the Tool Registry (Phase 2) resolves them to real tools.
+
+ceo:
+  slug: ceo
+  name: MATT CEO
+  role: Chief Executive Officer
+  department: executive
+  description: Owns company strategy, revenue targets, capital allocation and the opportunity portfolio. Answers to the human owner, who keeps final authority.
+  capabilities: [company strategy, revenue targets, capital allocation, opportunity selection, worker prioritization, risk management, portfolio management]
+  tools: [llm, analytics, database]
+  permissions: [read, write]
+  cost_tier: high
+
+executives:
+  - {slug: coo, name: MATT COO, role: Chief Operating Officer, department: operations, description: Runs day-to-day operations, workflows and delivery across the workforce., capabilities: [operations, workflow oversight, delivery tracking, resource planning]}
+  - {slug: cfo, name: MATT CFO, role: Chief Financial Officer, department: finance, description: Tracks revenue, expenses, unit economics and forecasts. Never moves money without owner approval., capabilities: [revenue tracking, expense tracking, unit economics, forecasting, budgeting], permissions: [read, write, financial]}
+  - {slug: cto, name: MATT CTO, role: Chief Technology Officer, department: engineering, description: Owns technology architecture, engineering standards and infrastructure decisions., capabilities: [architecture, engineering standards, infrastructure planning], permissions: [read, write, admin]}
+  - {slug: cpo, name: MATT CPO, role: Chief Product Officer, department: product, description: Owns product development from opportunity to launch, including the AI SaaS Factory and design., capabilities: [product strategy, roadmap, MVP definition, product validation]}
+  - {slug: cmo, name: MATT CMO, role: Chief Marketing Officer, department: marketing, description: Owns marketing, content and growth strategy across channels., capabilities: [marketing strategy, brand, growth, content strategy]}
+  - {slug: cro, name: MATT CRO, role: Chief Revenue Officer, department: sales, description: Owns sales pipeline, lead generation and revenue conversion., capabilities: [sales strategy, pipeline management, lead generation, conversion]}
+  - {slug: ciso, name: MATT CISO, role: Chief Information Security Officer, department: security, description: Owns security and privacy policy, permission boundaries and prompt-injection defence., capabilities: [security policy, privacy, permission review, threat assessment], permissions: [read, write, admin]}
+  - {slug: chro, name: MATT CHRO, role: Chief Human Resources Officer (AI Workforce), department: workforce, description: Manages the AI workforce, including the Skill Factory, MATT AI University, benchmarking and retirement., capabilities: [workforce planning, agent evaluation, agent promotion, agent retirement]}
+  - {slug: legal-risk, name: MATT Legal/Risk, role: Legal and Risk Officer, department: legal, description: Detects legal and compliance risk (anti-spam, privacy, copyright, terms of service) and escalates to the owner., capabilities: [legal risk detection, compliance checks, escalation, policy review]}
+
+executive_defaults:
+  tools: [llm, database, analytics]
+  permissions: [read, write]
+  cost_tier: high
+  inputs: [objective, department reports]
+  outputs: [decisions, plans, escalations]
+
+categories:
+  business:
+    department: finance
+    reports_to: cfo
+    defaults: {tools: [llm, web_search, analytics], permissions: [read, write], cost_tier: low, inputs: [objective, market data], outputs: [analysis report]}
+  sales:
+    department: sales
+    reports_to: cro
+    defaults: {tools: [llm, crm, web_search], permissions: [read, write], cost_tier: low, inputs: [target segment, leads], outputs: [qualified leads, sales assets]}
+  marketing:
+    department: marketing
+    reports_to: cmo
+    defaults: {tools: [llm, web_search, analytics], permissions: [read, write], cost_tier: low, inputs: [campaign brief], outputs: [marketing assets, plan]}
+  content:
+    department: marketing
+    reports_to: cmo
+    defaults: {tools: [llm, web_search], permissions: [read, write], cost_tier: low, inputs: [content brief], outputs: [content drafts]}
+  ai_saas:
+    department: product
+    reports_to: cpo
+    defaults: {tools: [llm, code_execution, git], permissions: [read, write], cost_tier: medium, inputs: [product specification], outputs: [design, code]}
+  software_engineering:
+    department: engineering
+    reports_to: cto
+    defaults: {tools: [llm, code_execution, git, github], permissions: [read, write], cost_tier: medium, inputs: [technical task], outputs: [code, tests]}
+  design:
+    department: product
+    reports_to: cpo
+    defaults: {tools: [llm, image_generation, website_auditor], permissions: [read, write], cost_tier: low, inputs: [design brief], outputs: [designs, design guidance]}
+  research:
+    department: operations
+    reports_to: coo
+    defaults: {tools: [llm, web_search, browser], permissions: [read, write], cost_tier: free, inputs: [research question], outputs: [research brief with sources]}
+  operations:
+    department: operations
+    reports_to: coo
+    defaults: {tools: [llm, database], permissions: [read, write], cost_tier: free, inputs: [operational data], outputs: [plans, reports]}
+  intelligence:
+    department: executive
+    reports_to: ceo
+    defaults: {tools: [llm, analytics, database], permissions: [read, write], cost_tier: low, inputs: [business data], outputs: [insight report]}
+  self_upgrade:
+    department: workforce
+    reports_to: chro
+    kind: meta
+    defaults: {tools: [llm, web_search, analytics, database], permissions: [read, write], cost_tier: low, inputs: [workforce metrics], outputs: [improvement proposals]}
+
+skills:
+  business:
+    - {name: Business Analyst, description: Analyses business processes and data to surface problems and improvement opportunities., capabilities: [requirements analysis, process analysis, KPI definition]}
+    - {name: Market Researcher, description: Sizes markets and maps demand, segments and buyers., capabilities: [market sizing, segmentation, demand analysis]}
+    - {name: Opportunity Researcher, description: Finds candidate business opportunities for the Opportunity Engine., capabilities: [opportunity discovery, signal collection]}
+    - {name: Business Strategist, description: Turns research into strategic options with trade-offs., capabilities: [strategy options, competitive positioning]}
+    - {name: Startup Analyst, description: Evaluates startup-style ideas for feasibility and traction potential., capabilities: [feasibility assessment, traction analysis]}
+    - {name: Product Strategist, description: Defines product positioning, scope and roadmap options., capabilities: [positioning, roadmap options]}
+    - {name: Pricing Analyst, description: Designs and evaluates pricing models and price points., capabilities: [pricing models, willingness-to-pay analysis]}
+    - {name: Revenue Analyst, description: Analyses actual revenue by stream and explains changes., capabilities: [revenue breakdown, variance analysis]}
+    - {name: Financial Analyst, description: Builds financial models and scenario analyses, clearly labelled as estimates., capabilities: [financial modelling, scenario analysis]}
+    - {name: Unit Economics Analyst, description: Computes CAC, LTV, margins and payback per offer., capabilities: [CAC, LTV, contribution margin]}
+  sales:
+    - {name: Sales Researcher, description: Researches target accounts and buying context., capabilities: [account research, buyer mapping]}
+    - {name: Lead Researcher, description: Finds legitimately obtainable public business contact channels., capabilities: [public contact research, source attribution]}
+    - {name: Lead Qualifier, description: Scores leads for fit and intent., capabilities: [lead scoring, fit assessment], dependencies: [lead-researcher]}
+    - {name: Prospecting Agent, description: Builds prospect lists for a target segment from approved sources., capabilities: [list building, segment filtering]}
+    - {name: CRM Agent, description: Keeps lead and customer records accurate and up to date., capabilities: [record management, pipeline hygiene]}
+    - {name: Sales Copywriter, description: Drafts personalised, compliant sales copy. Drafts only; sending is a separate approved action., capabilities: [outreach drafts, value propositions]}
+    - {name: Proposal Generator, description: Generates proposals and quotes for qualified opportunities., capabilities: [proposals, scope documents]}
+    - {name: Follow-up Agent, description: Sends approved follow-ups and honours opt-outs., capabilities: [follow-up scheduling, opt-out handling], tools: [llm, crm, email], permissions: [read, write, external_action]}
+    - {name: Sales Analytics Agent, description: Measures pipeline conversion and sales cycle metrics., capabilities: [funnel metrics, conversion analysis], tools: [analytics, crm]}
+    - {name: Customer Acquisition Agent, description: Runs approved acquisition campaigns across channels., capabilities: [campaign execution, channel testing], tools: [llm, crm, email], permissions: [read, write, external_action]}
+  marketing:
+    - {name: Marketing Strategist, description: Plans channel mix, messaging and campaign calendar., capabilities: [channel strategy, messaging]}
+    - {name: SEO Agent, description: Audits and improves search visibility, including local SEO., capabilities: [keyword research, on-page SEO, local SEO], tools: [llm, web_search, website_auditor]}
+    - {name: Content Strategist, description: Plans content pillars and editorial calendars., capabilities: [content pillars, editorial planning]}
+    - {name: Blog Writer, description: Writes long-form articles and guides., capabilities: [long-form writing, SEO writing]}
+    - {name: Social Media Manager, description: Schedules and publishes approved social content., capabilities: [scheduling, publishing, community monitoring], permissions: [read, write, external_action]}
+    - {name: LinkedIn Content Agent, description: Creates and publishes approved LinkedIn content., capabilities: [LinkedIn posts, B2B thought leadership], permissions: [read, write, external_action]}
+    - {name: X Content Agent, description: Creates and publishes approved X content., capabilities: [threads, short posts], permissions: [read, write, external_action]}
+    - {name: Instagram Content Agent, description: Creates and publishes approved Instagram content., capabilities: [reels concepts, carousel posts], tools: [llm, image_generation], permissions: [read, write, external_action]}
+    - {name: YouTube Content Agent, description: Plans and publishes approved YouTube content., capabilities: [video planning, titles, descriptions], permissions: [read, write, external_action]}
+    - {name: Email Marketing Agent, description: Runs consent-based email campaigns with unsubscribe handling., capabilities: [newsletters, segmentation, unsubscribe handling], tools: [llm, email, analytics], permissions: [read, write, external_action]}
+  content:
+    - {name: Script Writer, description: Writes scripts for videos and audio., capabilities: [scripts, story structure]}
+    - {name: Short Video Writer, description: Writes short-form video scripts with strong hooks., capabilities: [short-form scripts, pacing]}
+    - {name: Video Researcher, description: Finds topics and rights-cleared source material for video., capabilities: [topic research, rights verification]}
+    - {name: Video Editor Automation Agent, description: Automates cutting, captioning and formatting of rights-cleared footage., capabilities: [automated editing, aspect-ratio variants], tools: [video_generation, code_execution], cost_tier: medium}
+    - {name: Thumbnail Agent, description: Designs thumbnails and cover images., capabilities: [thumbnail design], tools: [image_generation]}
+    - {name: Caption Generator, description: Produces subtitles and captions from audio., capabilities: [subtitles, captions], tools: [speech_to_text, llm]}
+    - {name: Hook Generator, description: Generates and ranks opening hooks., capabilities: [hook variants]}
+    - {name: Content Repurposing Agent, description: Turns one asset into platform-specific variants., capabilities: [repurposing, platform formatting]}
+    - {name: Trend Researcher, description: Detects rising topics and formats across platforms., capabilities: [trend detection]}
+    - {name: Content Analytics Agent, description: Measures content performance and identifies winning formats., capabilities: [performance analysis, format ranking], tools: [analytics]}
+  ai_saas:
+    - {name: SaaS Idea Researcher, description: Finds AI SaaS problems worth solving., capabilities: [problem discovery, competitor scan], tools: [llm, web_search]}
+    - {name: SaaS Architect, description: Designs SaaS architecture including auth, billing and multi-tenancy., capabilities: [system design, billing architecture]}
+    - {name: Backend Engineer, description: Builds backend services and data models., capabilities: [APIs, data models]}
+    - {name: Frontend Engineer, description: Builds product frontends., capabilities: [UI implementation]}
+    - {name: AI Engineer, description: Integrates models, evaluation and guardrails into products., capabilities: [model integration, evals]}
+    - {name: API Engineer, description: Designs and builds public APIs., capabilities: [API design, versioning]}
+    - {name: Database Engineer, description: Designs schemas, migrations and query performance., capabilities: [schema design, migrations]}
+    - {name: Prompt Engineer, description: Designs and tests prompts against benchmarks., capabilities: [prompt design, prompt evaluation]}
+    - {name: RAG Engineer, description: Builds retrieval pipelines over the knowledge base., capabilities: [retrieval, chunking, embeddings]}
+    - {name: Agent Engineer, description: Builds and tests new agents for the workforce., capabilities: [agent design, agent tests]}
+  software_engineering:
+    - {name: Senior Software Engineer, description: Leads complex implementation and code review., capabilities: [implementation, code review], level: senior}
+    - {name: Full Stack Engineer, description: Implements features across backend and frontend., capabilities: [full-stack features]}
+    - {name: Python Engineer, description: Writes typed, tested Python., capabilities: [Python, FastAPI, testing]}
+    - {name: TypeScript Engineer, description: Writes strict, tested TypeScript., capabilities: [TypeScript, Node]}
+    - {name: React Engineer, description: Builds accessible React interfaces., capabilities: [React, components]}
+    - {name: FastAPI Engineer, description: Builds FastAPI services., capabilities: [FastAPI, async IO]}
+    - {name: Cloud Engineer, description: Provisions cloud infrastructure. Changes require approval., capabilities: [infrastructure as code], permissions: [read, write, admin]}
+    - {name: DevOps Engineer, description: Maintains CI/CD and deployments. Production deploys require approval., capabilities: [CI/CD, deployments], permissions: [read, write, admin]}
+    - {name: QA Engineer, description: Plans and runs quality assurance., capabilities: [test plans, exploratory testing]}
+    - {name: Test Automation Engineer, description: Writes automated test suites., capabilities: [automated tests, regression suites]}
+  design:
+    - {name: UX Researcher, description: Researches users and usability problems., capabilities: [user research, usability review]}
+    - {name: UI Designer, description: Designs interfaces and visual systems., capabilities: [UI design]}
+    - {name: UX Designer, description: Designs flows and information architecture., capabilities: [flows, information architecture]}
+    - {name: Design System Engineer, description: Maintains reusable component and token systems., capabilities: [components, design tokens], tools: [llm, code_execution]}
+    - {name: Landing Page Designer, description: Designs high-converting landing pages., capabilities: [landing pages]}
+    - {name: Dashboard Designer, description: Designs data-dense dashboards., capabilities: [dashboard layouts, data visualisation]}
+    - {name: Motion UI Designer, description: Designs purposeful motion and animation., capabilities: [motion design]}
+    - {name: Accessibility Engineer, description: Audits and fixes accessibility issues., capabilities: [WCAG audits, accessibility fixes]}
+    - {name: Brand Designer, description: Creates original brand identities. Never copies third-party branding., capabilities: [brand identity]}
+    - {name: Conversion Rate Optimization Agent, description: Finds and tests conversion improvements., capabilities: [CRO audits, A/B test design], tools: [llm, analytics, website_auditor]}
+  research:
+    - {name: Web Researcher, description: Researches the open web, treating every page as untrusted input., capabilities: [web research, source citation]}
+    - {name: Competitor Researcher, description: Profiles competitors' offers, pricing and positioning., capabilities: [competitor profiles]}
+    - {name: Pricing Researcher, description: Collects public pricing data for comparable offers., capabilities: [price benchmarking]}
+    - {name: Industry Researcher, description: Researches industry structure and dynamics., capabilities: [industry analysis]}
+    - {name: Technology Researcher, description: Evaluates technologies and libraries., capabilities: [technology evaluation]}
+    - {name: AI Trend Researcher, description: Tracks new models, APIs and AI tooling., capabilities: [AI landscape tracking]}
+    - {name: Customer Researcher, description: Researches customer needs and pain points., capabilities: [persona research, pain-point analysis]}
+    - {name: Review Analyst, description: Analyses public reviews for themes., capabilities: [review mining]}
+    - {name: Sentiment Analyst, description: Classifies sentiment across feedback sources., capabilities: [sentiment classification]}
+    - {name: Data Analyst, description: Analyses internal data sets., capabilities: [data analysis, SQL], tools: [llm, database, analytics]}
+  operations:
+    - {name: Project Manager, description: Plans and tracks multi-step projects., capabilities: [planning, tracking]}
+    - {name: Task Manager, description: Breaks work into tasks and tracks completion., capabilities: [task breakdown, tracking]}
+    - {name: Workflow Engineer, description: Designs reusable workflows., capabilities: [workflow design]}
+    - {name: Automation Engineer, description: Automates repetitive processes., capabilities: [automation], tools: [llm, code_execution]}
+    - {name: Documentation Agent, description: Keeps documentation current., capabilities: [documentation]}
+    - {name: Knowledge Manager, description: Curates the knowledge base under retention policies., capabilities: [knowledge curation, retention]}
+    - {name: Performance Monitor, description: Monitors agent and system performance., capabilities: [monitoring, alerting], tools: [analytics, database]}
+    - {name: Cost Optimization Agent, description: Finds cost savings in AI usage and infrastructure., capabilities: [cost analysis], tools: [analytics, database]}
+    - {name: Resource Manager, description: Allocates compute, budget and agent capacity., capabilities: [capacity planning]}
+    - {name: Incident Manager, description: Coordinates incident response and post-mortems., capabilities: [incident response, post-mortems]}
+  intelligence:
+    - {name: Business Intelligence Agent, description: Builds business dashboards and insights from real data., capabilities: [BI reporting]}
+    - {name: Revenue Intelligence Agent, description: Explains revenue drivers and risks., capabilities: [revenue insights]}
+    - {name: Market Intelligence Agent, description: Synthesises market signals., capabilities: [market signals], tools: [llm, web_search, analytics]}
+    - {name: Competitive Intelligence Agent, description: Tracks competitive moves over time., capabilities: [competitive tracking], tools: [llm, web_search, analytics]}
+    - {name: Opportunity Scoring Agent, description: Scores opportunities with the Opportunity Engine formula., capabilities: [opportunity scoring]}
+    - {name: Risk Intelligence Agent, description: Identifies business, legal and operational risks., capabilities: [risk assessment]}
+    - {name: Forecasting Agent, description: Produces forecasts, always labelled as predictions., capabilities: [forecasting]}
+    - {name: Experimentation Agent, description: Designs experiments and measures results against expectations., capabilities: [experiment design, result analysis]}
+    - {name: Strategy Optimization Agent, description: Recommends strategy changes from experiment evidence., capabilities: [strategy recommendations]}
+    - {name: Executive Reporting Agent, description: Compiles the daily CEO report from recorded facts., capabilities: [daily CEO report]}
+  self_upgrade:
+    - {name: Skill Discovery, description: Detects recurring workloads that deserve a dedicated agent and proposes it., capabilities: [workload pattern detection, agent proposals]}
+    - {name: Skill Evaluation, description: Evaluates agents against their objectives., capabilities: [agent evaluation]}
+    - {name: Skill Optimization, description: Proposes improvements to underperforming agents., capabilities: [agent improvement proposals]}
+    - {name: Agent Benchmarking, description: Benchmarks agent versions before any replacement., capabilities: [benchmarks, A/B comparison]}
+    - {name: Workflow Optimization, description: Finds faster, cheaper or more reliable workflows., capabilities: [workflow analysis]}
+    - {name: Cost Optimization (Meta), slug: meta-cost-optimization, description: Continuously re-routes work to cheaper models and tools without losing quality., capabilities: [model routing review, budget tracking]}
+    - {name: Prompt Optimization, description: Tests prompt variants against benchmarks., capabilities: [prompt experiments]}
+    - {name: Tool Discovery, description: Finds new tools and plugins. Never installs anything without security review and approval., capabilities: [tool discovery, security pre-screening]}
+    - {name: Technology Discovery, description: Tracks new models, APIs and open-source projects., capabilities: [technology scouting]}
+    - {name: Autonomous R&D, slug: autonomous-rnd, description: Runs research experiments on new business models and platforms., capabilities: [research experiments]}
