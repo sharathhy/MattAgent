@@ -54,10 +54,6 @@ class Settings(BaseSettings):
     ollama_model: str = "llama3.2"
     anthropic_api_key: str | None = None
     anthropic_model: str = "claude-opus-5-5"
-    #: The one paid exception, at the owner's request: Claude may draft "Change MATT" code
-    #: changes (never business work) when MATT_ANTHROPIC_API_KEY is set and this monthly cap is
-    #: above 0. At the cap MATT falls back to the free model. Everything else stays free-only.
-    code_ai_monthly_budget_inr: float = Field(default=0, ge=0)
     #: Premium (paid) models are only used when explicitly allowed.
     allow_premium_models: bool = False
     #: Hard rule: only free and local models are ever called. Paid providers are not even built.

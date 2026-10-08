@@ -51,6 +51,10 @@ class Provider(Protocol):
 class OpenAICompatibleProvider:
     """Gemini, Groq and Ollama all expose the OpenAI chat-completions wire format."""
 
+    #: Extra output tokens for models that think before answering. Their thinking counts
+    #: against max_tokens, so without headroom a short limit leaves an empty or cut-off reply.
+    THINKING_HEADROOM = 0
+
     def __init__(self, spec: ModelSpec, base_url: str, api_key: str | None, timeout: float = 90):
         self.spec = spec
         self.base_url = base_url.rstrip("/")
@@ -65,7 +69,7 @@ class OpenAICompatibleProvider:
                 {"role": "system", "content": system},
                 {"role": "user", "content": prompt},
             ],
-            "max_tokens": max_tokens,
+            "max_tokens": max_tokens + self.THINKING_HEADROOM,
         }
         start = time.perf_counter()
         try:
@@ -81,9 +85,13 @@ class OpenAICompatibleProvider:
             raise ProviderError(f"{self.spec.provider} HTTP {r.status_code}: {r.text[:300]}")
         data = r.json()
         try:
-            text = data["choices"][0]["message"]["content"] or ""
+            choice = data["choices"][0]
+            text = choice["message"]["content"] or ""
         except (KeyError, IndexError, TypeError) as exc:
             raise ProviderError(f"{self.spec.provider}: unexpected response shape") from exc
+        if not text.strip():
+            reason = choice.get("finish_reason") or "no reason given"
+            raise ProviderError(f"{self.spec.provider}: empty reply ({reason})")
         usage = data.get("usage") or {}
         return Completion(
             text=text,
@@ -158,6 +166,7 @@ class GeminiProvider(DiscoveringProvider):
     """Gemini through its OpenAI-compatible endpoint, free tier."""
 
     PREFERRED = ("gemini-flash-latest", "gemini-flash-lite-latest")
+    THINKING_HEADROOM = 4096  # Flash thinks by default; free tier limits count requests
     SKIP = ("image", "tts", "audio", "live", "embedding", "exp", "thinking", "vision", "pro")
 
     def _replacement(self, error: str) -> str | None:
@@ -171,6 +180,8 @@ class GeminiProvider(DiscoveringProvider):
 
 class ChatModelProvider(DiscoveringProvider):
     """Groq, Cerebras, Mistral and similar free tiers: pick the strongest general chat model."""
+
+    THINKING_HEADROOM = 2048  # reasoning models (gpt-oss, qwen3) think inside max_tokens
 
     SKIP = ("whisper", "guard", "tts", "embed", "audio", "image", "vision", "moderation",
             "ocr", "transcribe", "speech", "rerank", "prompt-guard", "safeguard")  # fmt: skip
@@ -192,6 +203,8 @@ class ChatModelProvider(DiscoveringProvider):
 class OpenRouterProvider(DiscoveringProvider):
     """OpenRouter's free models only: ids ending in ":free" with zero prompt and output price.
     Any other model is refused before a request is sent, so this key can never be charged."""
+
+    THINKING_HEADROOM = 2048
 
     def is_free(self, model: str) -> bool:
         return model.endswith(":free")

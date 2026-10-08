@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import { AutopilotPanel } from "../components/AutopilotPanel";
 import { ChangeRequests } from "../components/ChangeRequests";
 import { FreeModelScout } from "../components/FreeModelScout";
+import { HealthPanel } from "../components/HealthPanel";
 import { ReceivingAccounts } from "../components/ReceivingAccounts";
 import { Badge, PageHeader, Table, inr, useCan } from "../components/kit";
 import { ErrorState, Loading, Panel } from "../components/ui";
@@ -19,6 +20,7 @@ export function SettingsPage() {
   return (
     <div className="space-y-5">
       <PageHeader eyebrow="System" title="Settings" />
+      <HealthPanel />
       <AutopilotPanel full />
       <p className="text-sm text-muted">
         Secrets live only in the hosting environment (Render → Environment), never in the app or the repository. This page

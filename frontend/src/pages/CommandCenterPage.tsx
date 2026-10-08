@@ -5,10 +5,12 @@ import { api } from "../api/client";
 import { BootSequence } from "../components/hud/BootSequence";
 import { BrainCore } from "../components/hud/BrainCore";
 import { CommsPanel } from "../components/hud/CommsPanel";
+import { HealthPanel } from "../components/HealthPanel";
 import { EventFeed } from "../components/hud/EventFeed";
 import { HudClock } from "../components/hud/HudClock";
 import { RevenuePanel } from "../components/hud/RevenuePanel";
 import { LiveMetrics } from "../components/LiveMetrics";
+import { useCan } from "../components/kit";
 import { ErrorState, Loading, Panel, Stat } from "../components/ui";
 import { VoiceLockPanel } from "../components/VoiceLockPanel";
 import { titleCase } from "../lib/format";
@@ -19,6 +21,7 @@ export function CommandCenterPage() {
   const health = useQuery({ queryKey: ["health"], queryFn: api.health, refetchInterval: 30_000 });
   const dash = useQuery({ queryKey: ["dashboard"], queryFn: api.dashboard, refetchInterval: 5000 });
   const voice = useVoice();
+  const isAdmin = useCan("admin");
 
   return (
     <div className="space-y-6">
@@ -46,6 +49,7 @@ export function CommandCenterPage() {
           <BrainCore />
         </div>
         <div className="order-2 space-y-5 lg:order-3">
+          {isAdmin && <HealthPanel />}
           <CommsPanel />
           <EventFeed />
         </div>

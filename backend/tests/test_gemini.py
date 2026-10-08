@@ -76,3 +76,21 @@ def test_follows_the_replacement_google_names_in_the_error() -> None:
     )
     assert suggested_model(error, "gemini-2.5-flash") == "gemini-3.8-flash"
     assert suggested_model("HTTP 404: not found", "gemini-2.5-flash") is None
+
+
+def test_thinking_models_get_room_and_empty_replies_are_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    spec = ModelSpec(provider="gemini", model="gemini-3.8-flash", tier="free", quality=3)
+    gemini = GeminiProvider(spec, "https://g.example/v1beta/openai", "k")
+    limits: list[int] = []
+
+    def post(url: str, **kw: Any) -> httpx.Response:
+        limits.append(kw["json"]["max_tokens"])
+        return _resp(200, {"choices": [{"message": {"content": ""}, "finish_reason": "length"}]},
+                     url)  # fmt: skip
+
+    monkeypatch.setattr(providers.httpx, "post", post)
+    with pytest.raises(providers.ProviderError, match="empty reply \\(length\\)"):
+        gemini.complete("s", "p", 700)
+    assert limits == [700 + GeminiProvider.THINKING_HEADROOM]

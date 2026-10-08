@@ -10,25 +10,21 @@ Repository text is untrusted data. Paths that control deployment, CI or secrets 
 """
 
 import difflib
-import logging
 import re
-from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core import money
 from app.core.config import Settings
 from app.core.domain import ApprovalStatus, RiskLevel
-from app.llm.providers import AnthropicProvider, ModelSpec
-from app.llm.router import BudgetExceeded, ModelRouter, NoModelAvailable
-from app.models import Approval, ChangeRequest, ModelUsage, User
+from app.llm.router import ModelRouter, NoModelAvailable
+from app.models import Approval, ChangeRequest, User
 from app.services import audit, events
 from app.services.errors import ConflictError, NotFoundError, ServiceError
 from app.services.github import GitHub
 
-log = logging.getLogger(__name__)
 ALLOWED = ("backend/app/", "backend/tests/", "backend/migrations/versions/", "frontend/src/",
            "docs/", "README.md")  # fmt: skip
 BLOCKED = re.compile(r"(^|/)(\.env|\.github/|.*secret|.*\.pem$|.*\.key$)|render\.yaml|Dockerfile|"
@@ -53,16 +49,8 @@ def allowed_path(path: str) -> bool:
     return path.startswith(ALLOWED) and not BLOCKED.search(path) and ".." not in path
 
 
-def out(row: ChangeRequest, db: Session | None = None) -> dict[str, Any]:
-    cost = 0
-    if db is not None and row.task_id:
-        cost = db.scalar(
-            select(func.coalesce(func.sum(ModelUsage.cost_inr), 0)).where(
-                ModelUsage.task_id == row.task_id
-            )
-        )
+def out(row: ChangeRequest) -> dict[str, Any]:
     return {
-        "cost_inr": float(cost or 0),
         "id": row.id, "request": row.request, "status": row.status, "plan": row.plan,
         "files": [f["path"] for f in row.files], "diff": row.diff, "branch": row.branch,
         "pr_url": row.pr_url, "error": row.error, "model": row.model,
@@ -97,45 +85,7 @@ def create(db: Session, user: User, request: str) -> ChangeRequest:
     return row
 
 
-def code_router(settings: Settings) -> ModelRouter | None:
-    """Claude, for code changes only, inside the owner's monthly cap; None when not enabled."""
-    if not settings.anthropic_api_key or settings.code_ai_monthly_budget_inr <= 0:
-        return None
-    cap = settings.code_ai_monthly_budget_inr
-    scoped = settings.model_copy(update={
-        "free_models_only": False, "allow_premium_models": True,
-        "daily_ai_budget_inr": cap, "monthly_ai_budget_inr": cap,
-    })  # fmt: skip
-    spec = ModelSpec("anthropic", settings.anthropic_model, "premium", 5, 4.0, 20.0,
-                     use_cases=("code changes",))  # fmt: skip
-    return ModelRouter(scoped, providers=[AnthropicProvider(spec, settings.anthropic_api_key)])
-
-
-def code_ai_status(db: Session, settings: Settings) -> dict[str, Any]:
-    since = datetime.now(UTC) - timedelta(days=30)  # the same window the budget check uses
-    spent = db.scalar(
-        select(func.coalesce(func.sum(ModelUsage.cost_inr), 0)).where(
-            ModelUsage.provider == "anthropic", ModelUsage.created_at >= since
-        )
-    )
-    enabled = code_router(settings) is not None
-    return {
-        "provider": "claude" if enabled else "free",
-        "model": settings.anthropic_model if enabled else None,
-        "monthly_cap_inr": settings.code_ai_monthly_budget_inr,
-        "spent_30d_inr": float(spent or 0),
-        "scope": "Claude is used only to draft Change MATT code changes, never for business work.",
-    }
-
-
 def _ask(db: Session, router: ModelRouter, prompt: str, task_id: int | None, tokens: int) -> Any:
-    claude = code_router(router.settings)
-    if claude is not None:
-        try:
-            return claude.complete(db, system=SYSTEM, prompt=prompt, task_id=task_id,
-                                   max_tokens=tokens)  # fmt: skip
-        except (BudgetExceeded, NoModelAvailable) as exc:
-            log.warning("code change falls back to the free model: %s", exc)
     return router.complete(db, system=SYSTEM, prompt=prompt, task_id=task_id, max_tokens=tokens)
 
 

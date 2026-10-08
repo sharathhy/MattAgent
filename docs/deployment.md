@@ -36,8 +36,7 @@ MATT's agents need at least one model key. The cheapest is free:
    Never paste keys into chat, issues or the repository.
 
 **Free tier only.** `MATT_FREE_MODELS_ONLY` is `true` by default: the router refuses every paid
-or premium model in code for all business work. The one exception is Claude for drafting
-"Change MATT" code changes (below), and only when you set it up. Keep billing switched off on the
+or premium model in code, and an Anthropic key is ignored. Keep billing switched off on the
 Google Cloud project behind your AI Studio key; then the key stays on the free tier and going
 over the free limit returns "429 rate limited" instead of a charge. Never upgrade the key's plan.
 MATT uses `gemini-3.8-flash` by default (Google's recommended Flash model for new keys as of
@@ -71,15 +70,6 @@ Setup: on GitHub, Settings, Developer settings, Fine-grained tokens, create a to
 this repository with "Contents: read and write" and "Pull requests: read and write", and add it
 in Render as `MATT_GITHUB_TOKEN`. MATT refuses to change CI, deployment, lock or secret files.
 
-**Claude for code changes only (optional).** To draft code changes with Claude instead of the
-free model, add `MATT_ANTHROPIC_API_KEY` and a monthly cap in rupees,
-`MATT_CODE_AI_MONTHLY_BUDGET_INR` (for example `500`), in Render. Claude is then used only by
-the change-request flow; autopilot, skill bots, outreach and every other business task stay on
-free models because `MATT_FREE_MODELS_ONLY` stays `true`. When Claude's spend over the last 30
-days reaches the cap, or Claude fails, MATT drafts with the free model instead. The Change MATT
-panel shows Claude's spend against the cap and each change's AI cost, separately from business
-AI usage. With either setting blank or `0`, Claude is never called.
-
 ### Free Model Scout
 
 Every 6 hours (and when the service starts) the Cost Optimization skill checks each free-tier
@@ -88,13 +78,17 @@ any other model is refused before a request is sent), Cerebras and Mistral. For 
 service it reads the model list, switches to the best free model, and records health and the
 last 24 hours of calls in Settings, Free Model Scout. When one free tier hits its limit, the
 router moves on to the next. MATT cannot sign up or create keys itself, so the scout marks the
-most useful missing key as suggested (`MATT_GROQ_API_KEY`, `MATT_OPENROUTER_API_KEY`,
-`MATT_CEREBRAS_API_KEY`) in Render. Mistral's free plan trains on your prompts, so MATT never
+most useful missing key to add in Render as suggested (`MATT_GROQ_API_KEY`,
+`MATT_OPENROUTER_API_KEY`, `MATT_CEREBRAS_API_KEY`). Mistral's free plan trains on your prompts, so MATT never
 asks for it. Create every key on a free plan with no card, and keep billing off.
 
 Optional: `MATT_GROQ_API_KEY` (free tier) and `MATT_OLLAMA_URL` (your own server). Keep
-`MATT_FREE_MODELS_ONLY=true`: setting it to `false` would let business work use paid models
-too, within `MATT_DAILY_AI_BUDGET_INR` and `MATT_MONTHLY_AI_BUDGET_INR` (default 0).
+`MATT_FREE_MODELS_ONLY=true`: everything, including code changes, runs on free models.
+
+**When bots seem idle**, open the System health panel (Command Center or Settings). It shows the
+worker heartbeat, how many calls to each free AI model worked in the last 24 hours with the
+latest error, each recent bot turn and why it failed, and ideas ready for you to launch, each
+problem with its fix. "Test AI now" pings every connected free model on the spot.
 
 The worker runs inside the web service. On Render's free plan the service sleeps after about
 15 minutes without visitors, which also pauses the worker and autopilot; anything left running

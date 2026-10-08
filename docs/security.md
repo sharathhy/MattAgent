@@ -96,11 +96,3 @@ diff shown. After approval MATT opens a pull request from a new branch based on 
 drafted against; it never pushes to the deploy branch and never merges. CI, deployment
 (`render.yaml`, `Dockerfile`), lock files and secret files are refused. The GitHub token is a
 fine-grained token for this repository only, set in the hosting environment.
-
-## Claude for code changes
-
-`MATT_ANTHROPIC_API_KEY` is read only by the change-request flow (`app/services/changes.py`).
-The business model router never builds a Claude provider while `MATT_FREE_MODELS_ONLY` is on, so
-autopilot, skill bots and outreach cannot reach it. Claude spend is capped by
-`MATT_CODE_AI_MONTHLY_BUDGET_INR` over a rolling 30 days; at the cap, or with the key or cap
-unset, drafting uses the free model. Every Claude call is recorded in model usage like any other.
