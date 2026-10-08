@@ -62,3 +62,27 @@ def test_businesses_without_public_contact_are_counted_not_listed(
     db.commit()
     desk = client.get("/api/sales", headers=owner_headers).json()
     assert desk["offers"] == [] and desk["without_contact"] == 1
+
+
+def test_free_demo_website_is_built_hosted_and_offered(
+    client: TestClient, owner_headers: dict[str, str], seeded: None, db: Session
+) -> None:
+    lead = _lead(db, public_email="hi@iron.example")
+    lead.business.name = 'Iron <Gym> "Pro"'
+    db.commit()
+    offer = client.post(f"/api/sales/{lead.id}/demo", headers=owner_headers).json()
+    url = offer["demo_url"]
+    assert url.startswith("http://testserver/p/")
+    assert f"free demo website for {lead.business.name}: {url}" in offer["message"]
+    assert offer["message"].index(url) < offer["message"].index("Reply STOP")
+
+    page = client.get(url.removeprefix("http://testserver"))
+    assert page.status_code == 200 and "noindex" in page.headers["x-robots-tag"]
+    assert page.headers["content-security-policy"].startswith("default-src 'none'")
+    html = page.text
+    assert "Iron &lt;Gym&gt; &quot;Pro&quot;" in html and "<Gym>" not in html  # escaped
+    assert "tel:9845012345" in html.replace(" ", "") and "Not live yet" in html
+    assert client.get("/p/not-a-real-token-at-all").status_code == 404
+
+    again = client.post(f"/api/sales/{lead.id}/demo", headers=owner_headers).json()
+    assert again["demo_url"] == url  # rebuilding keeps the same link

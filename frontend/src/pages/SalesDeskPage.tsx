@@ -14,7 +14,7 @@ export function SalesDeskPage() {
     <div className="space-y-5">
       <PageHeader eyebrow="Earn" title="Sales Desk" />
       <ol className="list-decimal space-y-1 pl-5 text-sm text-muted">
-        <li>MATT finds local businesses with weak or missing websites, audits them and writes a personal offer.</li>
+        <li>MATT finds local businesses with weak or missing websites, builds each one a free demo website and writes a personal offer with its link.</li>
         <li>You set a price. MATT adds your UPI payment details to the offer.</li>
         <li>You press WhatsApp or Email. It opens on your own phone or email with the message ready; MATT sends nothing itself.</li>
         <li>When the customer pays you, press Paid. It is recorded as revenue. Then you deliver the work.</li>
@@ -44,6 +44,7 @@ function Offer({ offer }: { offer: SalesOffer }) {
   const keys = [["sales"], ["revenue"], ["dashboard"]];
   const setPriceAction = useAction(() => api.priceOffer(offer.lead_id, price), keys);
   const sent = useAction(() => api.offerSent(offer.lead_id), keys);
+  const demo = useAction(() => api.buildDemo(offer.lead_id), keys);
   const paid = useAction(() => api.offerPaid(offer.lead_id), keys);
   const pay = offer.payment;
   return (
@@ -54,6 +55,16 @@ function Offer({ offer }: { offer: SalesOffer }) {
         </h2>
         <Badge value={offer.status} />
         {offer.website_score !== null && <span className="text-xs text-muted">website score {offer.website_score}/100 (estimate)</span>}
+      </div>
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        {offer.demo_url ? (
+          <a className="text-accent underline" href={offer.demo_url} target="_blank" rel="noreferrer">Open the demo website</a>
+        ) : (
+          <span className="text-muted">No demo website yet.</span>
+        )}
+        <button type="button" className="btn bg-slate-700 px-2.5 py-1 text-xs text-slate-100" disabled={demo.isPending} onClick={() => demo.mutate(undefined)}>
+          {demo.isPending ? "Building…" : offer.demo_url ? "Rebuild demo" : "Build free demo website"}
+        </button>
       </div>
       <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-950/60 p-3 font-sans text-sm">{offer.message}</pre>
       <div className="flex flex-wrap items-center gap-2">
@@ -90,7 +101,7 @@ function Offer({ offer }: { offer: SalesOffer }) {
       </div>
       {pay && <p className="text-xs text-muted">Payment request {pay.reference}: ₹{pay.amount_inr} to {pay.upi_id ?? "your bank account"} · {pay.status}</p>}
       <p className="text-xs text-muted">Send one message per business, and stop if they reply STOP.</p>
-      <ActionError error={setPriceAction.error ?? sent.error ?? paid.error} />
+      <ActionError error={setPriceAction.error ?? sent.error ?? paid.error ?? demo.error} />
     </article>
   );
 }

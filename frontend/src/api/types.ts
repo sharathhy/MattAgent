@@ -543,6 +543,8 @@ export interface SalesOffer {
   whatsapp_url: string | null;
   email_url: string | null;
   payment: PaymentRequest | null;
+  /** Preview link of the free demo website MATT built for this business. */
+  demo_url: string | null;
 }
 
 export interface SalesDesk {

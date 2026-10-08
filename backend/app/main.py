@@ -15,6 +15,7 @@ from app.api.routes import (
     auth,
     business,
     changes,
+    demo,
     health,
     ops,
     payments,
@@ -96,6 +97,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         sales.router,
     ):
         app.include_router(router, prefix=settings.api_prefix)
+    app.include_router(demo.router)  # public preview links live outside the API
     if settings.static_dir:
         _serve_frontend(app, Path(settings.static_dir), settings.api_prefix)
     return app

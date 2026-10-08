@@ -187,8 +187,14 @@ def draft_outreach(ctx: Context, params: dict[str, Any]) -> dict[str, Any]:
         "website_score_estimate": b.website_score,
         "findings": (b.audit or {}).get("findings", [])[:8], "service": lead.service,
     }  # fmt: skip
+    from app.services import demo_sites
+
+    ctx.emit("workflow.step", step="demo", message=f"Building a free demo website for {b.name}")
+    demo_sites.build(ctx.db, ctx.router, lead, ctx.router.settings.upi_payee_name)
     objective = (
         "Write a short, honest, personalised B2B email to this business offering the service. "
+        "Say you have already made them a free demo website (the link is added under your "
+        "message; do not write a link yourself). "
         "Mention one or two specific findings. No hype, no false claims, no fake urgency, no "
         "promises of results. Include a clear one-line opt-out ('Reply STOP and I won't contact "
         "you again'). Give a subject line first as 'Subject: ...'. "
@@ -206,8 +212,9 @@ def draft_outreach(ctx: Context, params: dict[str, Any]) -> dict[str, Any]:
     else:
         b.outreach_status = "ready"
         lead.next_action = (
-            "Draft ready. Send it from your own email: MATT has no email provider connected, "
-            "so it sends nothing. One message per business; honour any STOP reply."
+            "Draft and free demo website ready. Open the Sales Desk to send it from your own "
+            "WhatsApp or email: MATT has no email provider connected, so it sends nothing. One "
+            "message per business; honour any STOP reply."
         )
     events.emit(ctx.db, "outreach.drafted", lead_id=lead.id, status=b.outreach_status)
     ctx.db.commit()

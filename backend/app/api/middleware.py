@@ -18,6 +18,7 @@ SECURITY_HEADERS = {
     "Referrer-Policy": "no-referrer",
     "Permissions-Policy": "camera=(), geolocation=()",
 }
+DEMO_CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; frame-ancestors 'none'"
 API_CSP = "default-src 'none'; frame-ancestors 'none'"
 #: For the web app when the API process also serves it (single-service deployments).
 WEB_CSP = (
@@ -55,7 +56,10 @@ async def request_context(
     path = request.url.path
     if not path.startswith(("/docs", "/redoc", "/openapi.json")):
         response.headers.update(SECURITY_HEADERS)
-        if path.startswith("/api"):
+        if path.startswith("/p/"):  # demo website previews: static HTML, no scripts at all
+            response.headers["Content-Security-Policy"] = DEMO_CSP
+            response.headers["Referrer-Policy"] = "no-referrer"
+        elif path.startswith("/api"):
             response.headers["Content-Security-Policy"] = API_CSP
         else:
             response.headers["Content-Security-Policy"] = WEB_CSP

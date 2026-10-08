@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from app.core.config import Settings
 from app.core.domain import LeadStatus, RevenueCategory
 from app.models import Business, Lead, PaymentRequest, User
-from app.services import events, payments
+from app.services import demo_sites, events, payments
 from app.services.errors import NotFoundError, ServiceError
 
 DEFAULT_PRICE = Decimal("4999")
@@ -69,20 +69,32 @@ def _request(db: Session, lead: Lead) -> PaymentRequest | None:
     )
 
 
-def message(db: Session, settings: Settings, lead: Lead) -> str:
+def demo_url(db: Session, lead: Lead, base_url: str) -> str | None:
+    row = demo_sites.find(db, lead)
+    return f"{base_url.rstrip('/')}/p/{row.title}" if row else None
+
+
+def message(db: Session, settings: Settings, lead: Lead, base_url: str = "") -> str:
     text = (lead.outreach_draft or template_offer(lead)).strip()
+    extra: list[str] = []
+    if url := demo_url(db, lead, base_url):
+        extra.append(f"I've already made a free demo website for {lead.business.name}: {url}")
     pay = _request(db, lead)
     if pay is not None and pay.upi_id:
-        text += (
-            f"\n\nIf you'd like to go ahead, the price is ₹{pay.amount_inr:,.0f}, paid by UPI to "
-            f"{pay.upi_id} (reference {pay.reference})."
+        extra.append(
+            f"If you like it, I'll put it live for ₹{pay.amount_inr:,.0f}, paid by UPI to "
+            f"{pay.upi_id} (reference {pay.reference}) once you're happy."
         )
-    return text
+    if not extra:
+        return text
+    lines = text.splitlines()
+    stop = next((i for i, ln in enumerate(lines) if "STOP" in ln), len(lines))
+    return "\n".join([*lines[:stop], *extra, "", *lines[stop:]]).strip()
 
 
-def card(db: Session, settings: Settings, lead: Lead) -> dict[str, Any]:
+def card(db: Session, settings: Settings, lead: Lead, base_url: str = "") -> dict[str, Any]:
     b = lead.business
-    text = message(db, settings, lead)
+    text = message(db, settings, lead, base_url)
     subject = next((ln[8:].strip() for ln in text.splitlines() if ln.startswith("Subject:")),
                    f"A quick fix for {b.name}'s website")  # fmt: skip
     body = "\n".join(ln for ln in text.splitlines() if not ln.startswith("Subject:")).strip()
@@ -102,10 +114,11 @@ def card(db: Session, settings: Settings, lead: Lead) -> dict[str, Any]:
         "email_url": (f"mailto:{b.public_email}?subject={quote(subject)}&body={quote(body)}"
                       if b.public_email else None),
         "payment": payments.out(db, pay, settings) if pay else None,
+        "demo_url": demo_url(db, lead, base_url),
     }  # fmt: skip
 
 
-def desk(db: Session, settings: Settings) -> dict[str, Any]:
+def desk(db: Session, settings: Settings, base_url: str = "") -> dict[str, Any]:
     leads = db.scalars(
         select(Lead)
         .join(Business)
@@ -116,7 +129,7 @@ def desk(db: Session, settings: Settings) -> dict[str, Any]:
     reachable = [lead for lead in leads if lead.business.public_phone or lead.business.public_email]
     return {
         "upi_ready": payments.upi_id(db, settings) is not None,
-        "offers": [card(db, settings, lead) for lead in reachable],
+        "offers": [card(db, settings, lead, base_url) for lead in reachable],
         "without_contact": len(leads) - len(reachable),
     }
 
@@ -162,5 +175,13 @@ def mark_paid(db: Session, user: User, lead_id: int) -> Lead:
     lead.status = LeadStatus.WON
     lead.next_action = "Paid. Deliver the work."
     events.emit(db, "sales.offer_paid", lead_id=lead.id, amount_inr=str(pay.amount_inr))
+    db.commit()
+    return lead
+
+
+def make_demo(db: Session, router: Any, settings: Settings, lead_id: int) -> Lead:
+    lead = _lead(db, lead_id)
+    demo_sites.build(db, router, lead, settings.upi_payee_name)
+    events.emit(db, "sales.demo_built", lead_id=lead.id)
     db.commit()
     return lead

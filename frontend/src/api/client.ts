@@ -132,6 +132,7 @@ export const api = {
   diagnostics: () => request<Diagnostics>("/diagnostics"),
   salesDesk: () => request<SalesDesk>("/sales"),
   priceOffer: (leadId: number, amount_inr: number) => post<SalesOffer>(`/sales/${leadId}/price`, { amount_inr }),
+  buildDemo: (leadId: number) => post<SalesOffer>(`/sales/${leadId}/demo`, {}),
   offerSent: (leadId: number) => post<SalesOffer>(`/sales/${leadId}/sent`, {}),
   offerPaid: (leadId: number) => post<SalesOffer>(`/sales/${leadId}/paid`, {}),
   testAi: () => post<AiTest[]>("/diagnostics/test-ai", {}),

@@ -352,6 +352,7 @@ describe("sales desk", () => {
           payment: { id: 3, reference: "MATT000003", amount_inr: "4999.00", purpose: "x", customer_id: null, category: "websites",
             status: "requested", upi_id: "owner.test@ybl", upi_link: null, qr_svg: null, bank: null, ledger_entry_id: null,
             created_at: "2026-10-08T10:00:00Z", received_at: null },
+          demo_url: "https://matt.example/p/abc123abc123abc123",
         }],
       },
     });
@@ -359,5 +360,6 @@ describe("sales desk", () => {
     expect(await screen.findByText("Hello Iron Gym team")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /WhatsApp 98450 12345/ })).toHaveAttribute("href", "https://wa.me/919845012345?text=Hello");
     expect(screen.getByRole("button", { name: "Paid ₹4999.00" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open the demo website" })).toHaveAttribute("href", "https://matt.example/p/abc123abc123abc123");
   });
 });
