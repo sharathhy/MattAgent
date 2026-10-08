@@ -417,3 +417,29 @@ export interface FreeModelSource {
   calls_24h: number;
   failures_24h: number;
 }
+
+export interface PaymentConfig {
+  money_rule: "receive_only";
+  rule: string;
+  configured: boolean;
+  upi_id: string | null;
+  payee_name: string;
+  problem: string | null;
+  verification: string;
+}
+
+export interface PaymentRequest {
+  id: number;
+  reference: string;
+  amount_inr: string;
+  purpose: string;
+  customer_id: number | null;
+  category: string;
+  status: "requested" | "received" | "cancelled";
+  upi_id: string;
+  upi_link: string;
+  qr_svg: string;
+  ledger_entry_id: number | null;
+  created_at: string;
+  received_at: string | null;
+}

@@ -15,6 +15,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.agents import runtime
+from app.core import money
 from app.core.domain import (
     ACTIVE_TASK_STATUSES,
     AgentStatus,
@@ -47,6 +48,7 @@ def create(
     parent: Task | None = None,
     commit: bool = True,
 ) -> Task:
+    money.refuse_outbound(objective)  # main rule: receive-only, above any approval
     agent = None
     if kind == "agent":
         agent = db.scalar(select(Agent).where(Agent.slug == (agent_slug or "ceo")))
@@ -188,6 +190,7 @@ def execute(db: Session, task: Task, router: ModelRouter) -> Task:
                         commit=False,
                     )
                     for s, o in result.delegations
+                    if not money.is_outbound(o)
                 ]
                 task.output_data = {"delegated_task_ids": [t.id for t in subs]}
         task.status = TaskStatus.SUCCEEDED

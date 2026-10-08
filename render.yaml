@@ -37,6 +37,12 @@ services:
         sync: false
       - key: MATT_CEREBRAS_API_KEY
         sync: false
+      # Receive-only payments: your own UPI ID (for example yourname@ybl from PhonePe). Customers
+      # pay it directly; MATT never sends, withdraws or debits money.
+      - key: MATT_UPI_ID
+        sync: false
+      - key: MATT_UPI_PAYEE_NAME
+        sync: false
       - key: MATT_FREE_MODELS_ONLY
         value: "true"
       - key: MATT_DAILY_AI_BUDGET_INR

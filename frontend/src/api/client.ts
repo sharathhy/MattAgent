@@ -15,6 +15,8 @@ import type {
   Lead,
   MattEvent,
   Opportunity,
+  PaymentConfig,
+  PaymentRequest,
   RegistrySummary,
   SystemSettings,
   Task,
@@ -120,6 +122,12 @@ export const api = {
   updateAutopilot: (body: Partial<Pick<AutopilotStatus, "enabled" | "cities" | "categories" | "interval_minutes" | "daily_outreach_drafts">>) =>
     send<AutopilotStatus>("PUT", "/autopilot", body),
   runAutopilot: () => post<Task | null>("/autopilot/run", {}),
+  paymentConfig: () => request<PaymentConfig>("/payments/config"),
+  paymentRequests: () => request<PaymentRequest[]>("/payments"),
+  requestPayment: (body: { amount_inr: number; purpose: string; category: string }) =>
+    post<PaymentRequest>("/payments", body),
+  paymentReceived: (id: number) => post<PaymentRequest>(`/payments/${id}/received`, {}),
+  cancelPayment: (id: number) => post<PaymentRequest>(`/payments/${id}/cancel`, {}),
   freeSources: () => request<FreeModelSource[]>("/models/free-sources"),
   runScout: () => post<FreeModelSource[]>("/models/scout", {}),
 

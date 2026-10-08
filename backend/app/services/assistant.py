@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core import money
 from app.core.domain import ApprovalStatus, RevenueCategory
 from app.models import Approval, Knowledge, Lead, Opportunity, User
 from app.services import autopilot, earnings, events
@@ -121,6 +122,8 @@ def _earnings_reply(db: Session, tz: str, text: str) -> Answer:
 def answer(db: Session, user: User, raw: str, tz: str) -> Answer | None:
     text = raw.lower().strip().rstrip("?.!")
 
+    if money.is_outbound(text):
+        return Answer(money.REFUSAL, "money_rule")
     if THANKS.match(text):
         return Answer("You're welcome.", "thanks")
     if DISMISS.match(text):

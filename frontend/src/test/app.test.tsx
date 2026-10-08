@@ -227,6 +227,31 @@ describe("working pages", () => {
     });
   });
 
+  it("asks customers to pay the owner's UPI ID and records money only when the owner confirms", async () => {
+    tokenStore.set("tok");
+    const fetchMock = mockApi({
+      "/auth/me": OWNER,
+      "/ledger": [{ id: 9, kind: "revenue", amount_inr: "100", category: "websites", description: "Earlier", occurred_on: "2026-10-01",
+        recurring: false, customer_id: null, product_id: null, agent_slug: null, recorded_by: "1", created_at: "2026-10-01T00:00:00Z" }],
+      "/payments/config": { money_rule: "receive_only", rule: "MATT only receives money.", configured: true, upi_id: "owner.test@ybl",
+        payee_name: "MATT", problem: null, verification: "Mark it received once it shows in PhonePe." },
+      "/payments": [{ id: 3, reference: "MATT000003", amount_inr: "15000.00", purpose: "Website for Mysore Dental", customer_id: null,
+        category: "websites", status: "requested", upi_id: "owner.test@ybl", upi_link: "upi://pay?pa=owner.test%40ybl&am=15000.00&cu=INR",
+        qr_svg: "<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>", ledger_entry_id: null, created_at: "2026-10-08T00:00:00Z", received_at: null }],
+      "/payments/3/received": { status: 200, body: {} },
+    });
+    renderApp("/revenue");
+    expect(await screen.findByText("Website for Mysore Dental")).toBeInTheDocument();
+    expect(screen.getAllByText("owner.test@ybl").length).toBeGreaterThan(0);
+    await userEvent.click(screen.getByRole("button", { name: "Show QR" }));
+    expect(screen.getByRole("img", { name: "UPI QR code for MATT000003" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open in a UPI app" })).toHaveAttribute("href", expect.stringContaining("upi://pay"));
+    await userEvent.click(screen.getByRole("button", { name: "Money received" }));
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.some(([url, init]) => String(url).endsWith("/payments/3/received") && init?.method === "POST")).toBe(true),
+    );
+  });
+
   it("lists tasks with their outcome", async () => {
     tokenStore.set("tok");
     mockApi({

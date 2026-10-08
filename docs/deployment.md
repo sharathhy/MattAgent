@@ -47,6 +47,15 @@ models the key can use and picks the newest Flash model, by itself.
 Autopilot keeps within the free limits: one main action every 15 minutes plus at most 48
 skill-bot turns a day, one at a time.
 
+### Getting paid (UPI, receive-only)
+
+Set `MATT_UPI_ID` in Render to your own UPI ID: in PhonePe, open your profile and copy the UPI ID
+shown there (it looks like `name@ybl` or `number@axl`; a bare phone number is not a UPI ID).
+Optionally set `MATT_UPI_PAYEE_NAME` to the name customers should see. Then Revenue, Get paid
+by UPI creates a payment request with a QR code and link that pays you directly. When the money
+shows in PhonePe, press "Money received" (owner only) and it is recorded as revenue. MATT never
+sends, withdraws or debits money.
+
 ### Free Model Scout
 
 Every 6 hours (and when the service starts) the Cost Optimization skill checks each free-tier

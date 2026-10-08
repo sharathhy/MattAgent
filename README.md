@@ -32,6 +32,9 @@ What works today:
 - **Alexa-style commands** that need no AI key: "how much did we earn today", "record 15k
   received for a website project", "which skills are earning", "what's pending", "top leads",
   "remember that...", "open revenue", "what time is it". Anything else goes to the CEO agent.
+- **Receive-only money (main rule):** customers pay the owner's own UPI ID directly through a
+  payment request (QR code and `upi://pay` link). MATT never sends, transfers, withdraws or
+  debits money, enforced in code; a payment counts as revenue once the owner confirms it.
 - **Earnings:** today, 7-day, month and total revenue from the ledger (business timezone
   `MATT_TIMEZONE`, default Asia/Kolkata), a 30-day daily series, revenue by stream, and which
   skills earned it.

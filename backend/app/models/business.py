@@ -152,3 +152,22 @@ class Knowledge(TimestampMixin, Base):
     agent_slug: Mapped[str | None] = mapped_column(String(100), index=True)
     source: Mapped[str] = mapped_column(String(100))
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class PaymentRequest(TimestampMixin, Base):
+    """A request for a customer to pay the owner directly by UPI. MATT never holds the money;
+    the request becomes revenue only when the owner confirms it arrived."""
+
+    __tablename__ = "payment_requests"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    reference: Mapped[str] = mapped_column(String(40), unique=True, index=True)
+    amount_inr: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+    purpose: Mapped[str] = mapped_column(String(300))
+    customer_id: Mapped[int | None] = mapped_column(ForeignKey("customers.id"))
+    category: Mapped[str] = mapped_column(String(30))
+    status: Mapped[str] = mapped_column(String(20), index=True)  # requested | received | cancelled
+    upi_id: Mapped[str] = mapped_column(String(100))
+    ledger_entry_id: Mapped[int | None] = mapped_column(ForeignKey("ledger_entries.id"))
+    created_by: Mapped[str] = mapped_column(String(100))
+    received_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

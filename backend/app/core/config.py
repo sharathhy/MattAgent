@@ -62,6 +62,10 @@ class Settings(BaseSettings):
     daily_ai_budget_inr: float = Field(default=0, ge=0)
     monthly_ai_budget_inr: float = Field(default=0, ge=0)
     usd_to_inr: float = Field(default=84.0, gt=0)
+    #: Where customers pay: the owner's own UPI ID (for example a PhonePe UPI ID). Set it only in
+    #: the hosting environment. MATT is receive-only: it never sends or debits money.
+    upi_id: str | None = None
+    upi_payee_name: str = "MATT"
     #: Business timezone: decides what "today" means for revenue.
     timezone: str = "Asia/Kolkata"
 
@@ -82,6 +86,7 @@ class Settings(BaseSettings):
         "openrouter_api_key",
         "cerebras_api_key",
         "mistral_api_key",
+        "upi_id",
         "ollama_url",
         "anthropic_api_key",
         mode="before",

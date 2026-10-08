@@ -8,6 +8,7 @@ from app.models.business import (
     Lead,
     LedgerEntry,
     Opportunity,
+    PaymentRequest,
     Product,
 )
 from app.models.ops import (
@@ -25,5 +26,5 @@ from app.models.user import User
 __all__ = [
     "Agent", "AgentVersion", "Approval", "AuditLog", "Autopilot", "Business", "Customer", "Event",
     "Experiment", "Knowledge", "Lead", "LedgerEntry", "ModelSource", "ModelUsage", "Opportunity",
-    "Product", "Task", "Tool", "User", "WorkflowRun",
+    "PaymentRequest", "Product", "Task", "Tool", "User", "WorkflowRun",
 ]  # fmt: skip

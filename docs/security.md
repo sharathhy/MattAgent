@@ -52,3 +52,18 @@
 ## Reporting
 
 Report vulnerabilities privately to the repository owner rather than in a public issue.
+
+## Money: receive-only (main rule)
+
+MATT only ever receives money, straight into the owner's own UPI account (for example PhonePe).
+It never holds funds and has no code path that sends, transfers, withdraws, refunds or debits
+money. This is enforced in code, above the approval gates:
+
+- `app/core/money.py` detects outbound-money requests. Tasks (including agent delegations) and
+  voice or typed commands that ask to move money out are refused, even if someone would approve.
+- Every agent's rules forbid planning or delegating outbound payments.
+- `app/services/payments.py` only creates UPI payment requests (a `upi://pay` link and QR code
+  addressed to `MATT_UPI_ID`). A test fails if a function there is ever named like a payout.
+- MATT cannot see the owner's UPI account, so a request becomes revenue only when the owner
+  confirms the money arrived. The UPI ID is set only in the hosting environment, never in the
+  repository.

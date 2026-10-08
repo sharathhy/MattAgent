@@ -1,5 +1,6 @@
 import type { Customer, Experiment, Knowledge, LedgerEntry, Product } from "../api/types";
 import { Badge, Truth, inr } from "../components/kit";
+import { PaymentRequests } from "../components/PaymentRequests";
 import { RecordsPage } from "../components/RecordsPage";
 import { Stat } from "../components/ui";
 import { formatDate, titleCase } from "../lib/format";
@@ -74,6 +75,7 @@ export function RevenuePage() {
         rows.filter((r) => r.kind === "revenue").forEach((r) => byCat.set(r.category, (byCat.get(r.category) ?? 0) + Number(r.amount_inr)));
         return (
           <div className="space-y-3">
+          <PaymentRequests categories={REVENUE_CATEGORIES} />
           <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
             <Stat label="Today" value={inr(sum("revenue", today()))} hint="Revenue recorded today" />
             <Stat label="Revenue" value={inr(sum("revenue"))} hint="All recorded" />
