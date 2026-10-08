@@ -10,11 +10,17 @@ from typing import Any
 import httpx
 
 from app.core.domain import CostTier, Permission, RiskLevel
-from app.core.net import USER_AGENT
+from app.core.net import USER_AGENT, ipv4_transport
 from app.plugins.base import ToolDefinition
 
 NOMINATIM = "https://nominatim.openstreetmap.org/search"
 OVERPASS = "https://overpass-api.de/api/interpreter"
+#: Public Overpass instances listed on the OSM wiki, tried in turn when one is down or busy.
+OVERPASS_MIRRORS = (
+    OVERPASS,
+    "https://overpass.private.coffee/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+)
 
 #: Spec categories → OSM tag filters.
 CATEGORIES: dict[str, list[str]] = {
@@ -42,15 +48,49 @@ class DiscoveryError(RuntimeError):
 
 
 def _client() -> httpx.Client:
-    return httpx.Client(timeout=60, headers={"User-Agent": USER_AGENT})
+    return httpx.Client(timeout=60, headers={"User-Agent": USER_AGENT}, transport=ipv4_transport())
+
+
+def overpass(query: str, client: httpx.Client) -> dict[str, Any]:
+    """Run an Overpass query, moving to the next public instance if one fails or is busy."""
+    errors: list[str] = []
+    for url in OVERPASS_MIRRORS:
+        try:
+            r = client.post(url, data={"data": query})
+        except httpx.HTTPError as exc:
+            errors.append(f"{httpx.URL(url).host}: {exc}")
+            continue
+        if r.status_code == 429 or r.status_code >= 500:
+            errors.append(f"{httpx.URL(url).host}: HTTP {r.status_code}")
+            continue
+        r.raise_for_status()
+        data: dict[str, Any] = r.json()
+        return data
+    if all("429" in e for e in errors):
+        raise DiscoveryError("OpenStreetMap Overpass is rate limiting; try again shortly")
+    raise DiscoveryError("OpenStreetMap request failed: " + "; ".join(errors))
 
 
 def geocode_area(city: str, client: httpx.Client) -> int:
-    r = client.get(NOMINATIM, params={"q": city, "format": "json", "limit": 5})
-    r.raise_for_status()
-    for place in r.json():
-        if place.get("osm_type") == "relation":
-            return 3_600_000_000 + int(place["osm_id"])
+    try:
+        r = client.get(NOMINATIM, params={"q": city, "format": "json", "limit": 5})
+        r.raise_for_status()
+        places = r.json()
+    except httpx.HTTPError:
+        places = None
+    if places is not None:
+        for place in places:
+            if place.get("osm_type") == "relation":
+                return 3_600_000_000 + int(place["osm_id"])
+        raise DiscoveryError(f"Could not find an area called {city!r} on OpenStreetMap")
+    # Nominatim unreachable: look the city up through Overpass instead.
+    name = city.replace("\\", "").replace('"', "")
+    found = overpass(
+        f'[out:json][timeout:25];rel["boundary"="administrative"]["name"="{name}"];out ids 5;',
+        client,
+    ).get("elements", [])
+    if found:
+        return 3_600_000_000 + int(found[0]["id"])
     raise DiscoveryError(f"Could not find an area called {city!r} on OpenStreetMap")
 
 
@@ -70,11 +110,7 @@ def discover(
         query = (
             f"[out:json][timeout:50];area({area})->.a;({selectors});out center tags {limit * 3};"
         )
-        r = client.post(OVERPASS, data={"data": query})
-        if r.status_code == 429:
-            raise DiscoveryError("OpenStreetMap Overpass is rate limiting; try again shortly")
-        r.raise_for_status()
-        elements = r.json().get("elements", [])
+        elements = overpass(query, client).get("elements", [])
     except httpx.HTTPError as exc:
         raise DiscoveryError(f"OpenStreetMap request failed: {exc}") from exc
     finally:

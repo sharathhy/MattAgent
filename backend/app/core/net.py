@@ -53,6 +53,12 @@ def check_url(url: str, resolve: Resolver = system_resolver) -> None:
             raise BlockedURL(f"{host} resolves to a non-public address")
 
 
+def ipv4_transport() -> httpx.HTTPTransport:
+    """Connect over IPv4. Hosts like Render have no IPv6 route, and when a site's DNS lists an
+    IPv6 address first the connection fails with "[Errno 101] Network is unreachable"."""
+    return httpx.HTTPTransport(local_address="0.0.0.0", retries=1)  # noqa: S104 (outbound source address, not a listener)
+
+
 @dataclass(frozen=True)
 class FetchResult:
     url: str
@@ -74,7 +80,9 @@ def safe_fetch(
 ) -> FetchResult:
     """Fetch a public URL, re-checking every redirect hop."""
     own = client is None
-    client = client or httpx.Client(timeout=timeout, follow_redirects=False)
+    client = client or httpx.Client(
+        timeout=timeout, follow_redirects=False, transport=ipv4_transport()
+    )
     try:
         current = url
         start = time.perf_counter()

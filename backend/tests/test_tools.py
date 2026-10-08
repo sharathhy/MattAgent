@@ -107,3 +107,27 @@ def test_discovery_parses_overpass() -> None:
 def test_discovery_rejects_unknown_category() -> None:
     with pytest.raises(business_discovery.DiscoveryError, match="Unknown category"):
         business_discovery.discover("Mysore", "spaceships", client=_client(_page("")))
+
+
+def test_discovery_survives_unreachable_servers() -> None:
+    hosts: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        hosts.append(request.url.host)
+        if request.url.host in ("nominatim.openstreetmap.org", "overpass-api.de"):
+            raise httpx.ConnectError("[Errno 101] Network is unreachable", request=request)
+        if b"boundary" in request.content:  # city lookup through Overpass instead of Nominatim
+            return httpx.Response(200, json={"elements": [{"type": "relation", "id": 42}]})
+        assert b"3600000042" in request.content
+        return httpx.Response(200, json={"elements": [{"type": "node", "id": 1,
+                                                       "tags": {"name": "Iron Gym"}}]})  # fmt: skip
+
+    result = business_discovery.discover("Mysore", "gyms", client=_client(handler))
+    assert [b["name"] for b in result["businesses"]] == ["Iron Gym"]
+    assert "overpass.private.coffee" in hosts
+
+    def down(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("[Errno 101] Network is unreachable", request=request)
+
+    with pytest.raises(business_discovery.DiscoveryError, match=r"overpass\.kumi\.systems"):
+        business_discovery.discover("Mysore", "gyms", client=_client(down))
