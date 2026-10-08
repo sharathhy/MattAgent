@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 
 import type { AgentStatus } from "../api/types";
-import { PHASE_NAMES } from "../lib/navigation";
 
 export function Panel({ title, children, className = "" }: { title?: string; children: ReactNode; className?: string }) {
   return (
@@ -18,19 +17,6 @@ export function Stat({ label, value, hint }: { label: string; value: ReactNode; 
       <div className="label">{label}</div>
       <div className="mt-2 font-mono text-2xl font-semibold text-slate-100">{value}</div>
       {hint && <div className="mt-1 text-xs text-muted">{hint}</div>}
-    </div>
-  );
-}
-
-/** A metric whose engine does not exist yet. Never shows a number. */
-export function PendingStat({ label, phase }: { label: string; phase: number }) {
-  return (
-    <div className="panel p-4 opacity-70">
-      <div className="label">{label}</div>
-      <div className="mt-2 text-sm font-medium text-slate-400">Coming soon</div>
-      <div className="mt-1 text-xs text-muted">
-        Phase {phase} · {PHASE_NAMES[phase]}
-      </div>
     </div>
   );
 }
@@ -67,17 +53,6 @@ export function ErrorState({ error }: { error: unknown }) {
   return (
     <div role="alert" className="panel border-danger/40 p-4 text-sm text-danger">
       {message}
-    </div>
-  );
-}
-
-export function ComingSoon({ title, phase, description }: { title: string; phase: number; description: string }) {
-  return (
-    <div className="mx-auto max-w-xl pt-16 text-center">
-      <div className="label">Phase {phase} · {PHASE_NAMES[phase]}</div>
-      <h1 className="mt-3 text-3xl font-semibold">{title}</h1>
-      <p className="mt-3 text-muted">{description}. This capability is not built yet, so nothing here is simulated.</p>
-      <div className="panel mt-8 p-6 text-sm text-slate-400">Coming soon</div>
     </div>
   );
 }

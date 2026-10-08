@@ -31,17 +31,23 @@
 - No refresh tokens or token revocation yet; keep `MATT_ACCESS_TOKEN_MINUTES` short.
 - Dependency scanning (e.g. `pip-audit`, `npm audit`, Dependabot) is not yet in CI.
 
+## Agents and outbound requests
+
+- **Prompt-injection defence:** external content (web pages, business data, task context) is
+  passed to models only inside `<untrusted_data>` tags with a standing instruction never to
+  follow it. Agents have no tool that sends, spends or publishes; such actions become approvals,
+  and delegation is limited to an agent's direct reports and three levels deep.
+- **Approval gate:** outreach is high risk and only the owner can approve it; budget overruns
+  can be approved by an admin. Every decision is audited.
+- **SSRF protection:** `app/core/net.py` allows only http(s) on ports 80/443, rejects
+  credentials in URLs and internal hostnames, resolves the host and blocks private, loopback,
+  link-local and reserved addresses, re-checks every redirect hop, and caps size (2 MB) and time.
+- **Data minimisation:** only public business listings are stored, with their source; an admin
+  can delete a business and its lead on request.
+
 ## Planned with the capabilities that need them
 
-- **Prompt-injection defence (Phase 2+):** all external content (web pages, emails, documents)
-  is passed to models as clearly delimited untrusted data; tool calls are checked against the
-  agent's permissions and the approval policy outside the model, so injected text cannot grant
-  permissions, approve actions, or reveal secrets.
-- **Approval gate (Phase 3):** external actions, spending, publishing, deletion, infrastructure
-  and production changes require an owner decision.
-- **SSRF and malicious-site protection (Phase 4):** website auditing fetches through an
-  allow-listed, private-IP-blocking fetcher with size and time limits.
-- **Sandboxed code execution and plugin vetting (Phases 2 and 7).**
+- **Sandboxed code execution and plugin vetting (Phase 7).** No agent can run code today.
 
 ## Reporting
 

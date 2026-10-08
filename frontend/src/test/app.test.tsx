@@ -98,20 +98,35 @@ describe("authentication", () => {
   });
 });
 
+const DASHBOARD = {
+  revenue: { truth: "fact", month_inr: 25000, total_inr: 25000, expenses_month_inr: 5000, profit_month_inr: 20000, entries: 2 },
+  tasks: { by_status: { succeeded: 3, failed: 1 }, active: 2, recent: [
+    { id: 7, objective: "Find gyms in Mysore", status: "running", agent: null, kind: "workflow", created_at: "2026-10-08T00:00:00Z" },
+  ] },
+  approvals_pending: 1,
+  pipeline: { businesses: 10, audited: 6, leads_by_status: { new: 4 }, pipeline_value_inr: { truth: "assumption", min: 40000, max: 160000 } },
+  workforce: { agents: 120, agents_with_work: 3, top: [] },
+  ai: { model_available: false, spent_today_inr: 0, spent_month_inr: 0, daily_budget_inr: 0, monthly_budget_inr: 0, calls_today: 0 },
+  opportunities: [],
+};
+
 describe("command center", () => {
-  it("shows real registry counts and never invents business metrics", async () => {
+  it("shows live numbers computed from records", async () => {
     tokenStore.set("tok");
     mockApi({
       "/auth/me": OWNER,
       "/agents/summary": SUMMARY,
+      "/dashboard": DASHBOARD,
       "/health": { status: "ok", database: "ok", env: "test" },
     });
     renderApp("/command-center");
     const tile = (await screen.findByText("Registered Agents")).parentElement;
     expect(tile).toHaveTextContent("120");
-    const revenue = screen.getByText("Revenue Today").parentElement;
-    expect(revenue).toHaveTextContent("Coming soon");
-    expect(screen.queryByText(/₹/)).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Revenue This Month").parentElement).toHaveTextContent("₹25,000"));
+    expect(screen.getByText("Profit This Month").parentElement).toHaveTextContent("₹20,000");
+    expect(screen.getByText("Pipeline").parentElement).toHaveTextContent(/Assumption/);
+    expect(screen.getByText("AI Cost Today").parentElement).toHaveTextContent("No AI model key set");
+    expect(screen.getByText("Find gyms in Mysore")).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText(/System ok/)).toBeInTheDocument());
   });
 });
@@ -127,13 +142,84 @@ describe("agent detail", () => {
   });
 });
 
-describe("unbuilt capabilities", () => {
-  it("renders Coming soon for pages from later phases", async () => {
+describe("working pages", () => {
+  it("has no Coming soon page left", async () => {
     tokenStore.set("tok");
-    mockApi({ "/auth/me": OWNER });
+    const { NAV } = await import("../lib/navigation");
+    expect(NAV.filter((n) => n.phase)).toEqual([]);
+  });
+
+  it("lets the owner approve an outreach draft", async () => {
+    tokenStore.set("tok");
+    const approval = {
+      id: 3, task_id: 9, agent_slug: "sales-copywriter", action: "Send outreach email to Iron Gym", kind: "outreach",
+      details: { lead_id: 1, to: "hi@iron.example", draft: "Subject: Your website" }, estimated_cost_inr: "0",
+      risk_level: "high", status: "pending", decided_by: null, decided_at: null, note: null, created_at: "2026-10-08T00:00:00Z",
+    };
+    const fetchMock = mockApi({
+      "/auth/me": OWNER,
+      "/approvals": [approval],
+      "/approvals/3/decide": { ...approval, status: "approved" },
+    });
+    renderApp("/approvals");
+    expect(await screen.findByText("Subject: Your website")).toBeInTheDocument();
+    expect(screen.getByText(/no email provider connected/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Approve" }));
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(([url]) => String(url).endsWith("/approvals/3/decide"));
+      expect(JSON.parse(String(call?.[1]?.body))).toEqual({ approve: true, note: null });
+    });
+  });
+
+  it("hides approval buttons from people who cannot decide", async () => {
+    tokenStore.set("tok");
+    mockApi({
+      "/auth/me": { ...OWNER, role: "admin" },
+      "/approvals": [{ id: 3, task_id: null, agent_slug: "x", action: "Send email", kind: "outreach", details: {},
+        estimated_cost_inr: "0", risk_level: "high", status: "pending", decided_by: null, decided_at: null, note: null,
+        created_at: "2026-10-08T00:00:00Z" }],
+    });
+    renderApp("/approvals");
+    expect(await screen.findByText("Only the owner can decide this.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
+  });
+
+  it("records revenue as a fact from the form", async () => {
+    tokenStore.set("tok");
+    const fetchMock = mockApi({
+      "/auth/me": OWNER,
+      "/ledger": (init?: RequestInit) =>
+        init?.method === "POST" ? { status: 201, body: { id: 1 } } : { status: 200, body: [] },
+    });
     renderApp("/revenue");
-    expect(await screen.findByRole("heading", { name: "Revenue" })).toBeInTheDocument();
-    expect(screen.getByText(/Phase 5/)).toBeInTheDocument();
-    expect(screen.getByText(/nothing here is simulated/)).toBeInTheDocument();
+    expect(await screen.findByText("No revenue or expenses recorded yet.")).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("Amount (₹)"), "25000");
+    await userEvent.type(screen.getByLabelText("Description"), "Website for Iron Gym");
+    await userEvent.type(screen.getByLabelText("Date"), "2026-10-01");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(([url, init]) => String(url).endsWith("/ledger") && init?.method === "POST");
+      expect(JSON.parse(String(call?.[1]?.body))).toMatchObject({
+        kind: "revenue", amount_inr: "25000", category: "websites", occurred_on: "2026-10-01", recurring: false,
+      });
+    });
+  });
+
+  it("lists tasks with their outcome", async () => {
+    tokenStore.set("tok");
+    mockApi({
+      "/auth/me": OWNER,
+      "/agents": [],
+      "/tasks": [{
+        id: 5, kind: "agent", objective: "Plan the launch", agent_slug: "ceo", parent_id: null, status: "failed",
+        priority: 5, input: {}, output: null, output_data: null, error: "No AI model is configured", attempts: 1,
+        max_attempts: 3, next_attempt_at: null, model: null, cost_inr: "0", tokens: 0, created_by: "1",
+        created_at: "2026-10-08T00:00:00Z", started_at: null, finished_at: null,
+      }],
+    });
+    renderApp("/tasks");
+    await userEvent.click(await screen.findByText("Plan the launch"));
+    expect(screen.getByText("No AI model is configured")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
   });
 });

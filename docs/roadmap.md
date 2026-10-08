@@ -6,24 +6,22 @@ is shown as "Coming soon" in the UI; nothing is simulated.
 | Phase | Scope | Status |
 | --- | --- | --- |
 | 1 | Foundation: repository, backend, frontend, database, auth, config, logging, agent registry | Done |
-| 2 | Orchestration: tasks, workflows, agent runtime, tool registry, event bus (Redis + worker queue), free-first model router with budgets | Next |
-| 3 | Command center: live dashboard over WebSockets, approval center, analytics, agent activity | Planned |
-| 4 | Business intelligence: opportunity engine and scoring, business discovery via legitimate APIs, website auditor, leads | Planned |
-| 5 | Revenue engines: website service, AI SaaS factory, content and rights-cleared clipping, experiments, revenue portfolio | Planned |
+| 2 | Orchestration: tasks, workflows, agent runtime, tool registry, event bus, free-first model router with budgets | Done |
+| 3 | Command center: live dashboard, approval center, analytics, agent activity | Done (polling; WebSockets later) |
+| 4 | Business intelligence: opportunity engine and scoring, business discovery via OpenStreetMap, website auditor, leads, outreach drafts | Done (email sending not connected) |
+| 5 | Revenue engines: customers, products, revenue ledger, experiments | Records done; delivery engines planned |
 | 6 | Voice: speech-to-text, intent parsing, text-to-speech | Planned |
 | 7 | Self-evolving workforce: Skill Factory, AI University, benchmarking, versioned upgrades | Planned |
 | 8 | Hardening: security, observability, load tests, backups, disaster recovery | Planned |
 
-## Phase 2 plan
+## How Phase 2 was built
 
-1. `tools`, `tasks`, `workflows`, `events`, `model_usage` tables.
-2. Tool Registry with schema-validated inputs/outputs and risk level; tool calls checked against
-   agent permissions outside the model.
-3. Event bus on Redis streams; long-running work on a worker queue with retry limits and
-   exponential backoff (retry → alternative tool → alternative agent → human → fail).
-4. Model router: local/free models first, then free tiers, credits, low-cost, and premium only
-   within `MATT_DAILY_AI_BUDGET` / `MATT_MONTHLY_AI_BUDGET`; stop and ask when limits are hit.
-5. Orchestrator v1: objective → tasks → skill assignment → execution → validation → audit.
+- The queue is the `tasks` table, drained by a worker thread inside the web process, because
+  Render's free tier has no Redis. Failures retry with exponential backoff up to three attempts;
+  an exhausted AI budget parks the task behind an approval instead of failing it.
+- The event bus is the `events` table; the UI polls `GET /api/events?after_id=`.
+- Untrusted content (web pages, business data) reaches models only inside `<untrusted_data>`
+  tags, and agents cannot send, spend or publish: those actions become approvals.
 
 ## Adding an agent
 

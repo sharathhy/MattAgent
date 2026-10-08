@@ -2,6 +2,8 @@
 # Owner sign-in (see docs/deployment.md), set at least one of:
 #   MATT_GOOGLE_CLIENT_ID + MATT_OWNER_EMAIL  Google sign-in; only that Google account can become owner.
 #   MATT_BOOTSTRAP_TOKEN                      a private setup code for creating the owner with a password.
+# AI reasoning: set MATT_GEMINI_API_KEY (free tier, https://aistudio.google.com/apikey).
+# Groq and Anthropic keys are optional; paid models only run within the INR budgets below.
 # Leave any you don't use blank.
 services:
   - type: web
@@ -25,6 +27,16 @@ services:
         sync: false
       - key: MATT_BOOTSTRAP_TOKEN
         sync: false
+      - key: MATT_GEMINI_API_KEY
+        sync: false
+      - key: MATT_GROQ_API_KEY
+        sync: false
+      - key: MATT_ANTHROPIC_API_KEY
+        sync: false
+      - key: MATT_DAILY_AI_BUDGET_INR
+        value: "0"
+      - key: MATT_MONTHLY_AI_BUDGET_INR
+        value: "0"
 
 databases:
   - name: matt-db

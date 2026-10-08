@@ -3,7 +3,8 @@ import { Mic } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { api } from "../api/client";
-import { ErrorState, Loading, Panel, PendingStat, Stat } from "../components/ui";
+import { LiveMetrics } from "../components/LiveMetrics";
+import { ErrorState, Loading, Panel, Stat } from "../components/ui";
 import { titleCase } from "../lib/format";
 
 export function CommandCenterPage() {
@@ -29,18 +30,7 @@ export function CommandCenterPage() {
         </div>
       </header>
 
-      <section aria-label="Business metrics" className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6">
-        <PendingStat label="Company Value" phase={5} />
-        <PendingStat label="Revenue Today" phase={5} />
-        <PendingStat label="Revenue This Month" phase={5} />
-        <PendingStat label="Profit" phase={5} />
-        <PendingStat label="Pipeline" phase={4} />
-        <PendingStat label="Active Opportunities" phase={4} />
-        <PendingStat label="Tasks Running" phase={2} />
-        <PendingStat label="Tasks Completed" phase={2} />
-        <PendingStat label="AI Cost" phase={2} />
-        <PendingStat label="Human Approvals" phase={3} />
-      </section>
+      <LiveMetrics />
 
       {summary.isPending && <Loading label="Loading workforce" />}
       {summary.isError && <ErrorState error={summary.error} />}
@@ -59,8 +49,8 @@ export function CommandCenterPage() {
             <Panel title="Lifecycle status">
               <BarList data={summary.data.by_status} total={summary.data.total} />
               <p className="mt-4 text-xs text-muted">
-                Agents are registered definitions. None executes work until the orchestrator ships in Phase 2, so
-                no agent is shown as active. <Link to="/workforce" className="text-accent hover:underline">Open the workforce map</Link>
+                Lifecycle stages track how far each agent has been tested. Any agent can take tasks today.{" "}
+                <Link to="/workforce" className="text-accent hover:underline">Open the workforce map</Link>
               </p>
             </Panel>
           </div>
