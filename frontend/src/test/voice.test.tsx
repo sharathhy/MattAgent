@@ -6,7 +6,7 @@ import { tokenStore } from "../api/client";
 import { isOutboundMoney, runCommand } from "../voice/commands";
 import type { Recognition, RecognitionEvent } from "../voice/speech";
 import { similarity, voiceAccepted, type Voiceprint } from "../voice/voiceprint";
-import { detectWake } from "../voice/wake";
+import { detectWake, isStopPhrase } from "../voice/wake";
 import { OWNER, mockApi, renderApp } from "./utils";
 
 const SUMMARY = {
@@ -130,6 +130,50 @@ describe("voice lock", () => {
   });
 });
 
+describe("stop phrases", () => {
+  it("recognises stop, Matt stop, be quiet and cancel", () => {
+    for (const t of ["stop", "Stop.", "Matt stop", "hey Matt, be quiet", "cancel", "cancel that please", "shut up", "okay stop talking", "never mind"])
+      expect(isStopPhrase(t)).toBe(true);
+    for (const t of ["stop the autopilot campaign for gyms", "find bus stops in Pune", "cancel my subscription to the newsletter"])
+      expect(isStopPhrase(t)).toBe(false);
+  });
+
+  it("hears a stop glued onto MATT's own echo during barge-in", () => {
+    expect(isStopPhrase("I found twelve gyms in Mysore and matt stop", true)).toBe(true);
+    expect(isStopPhrase("I found twelve gyms in Mysore", true)).toBe(false);
+  });
+});
+
+/** A speech engine that talks until cancelled, so tests can interrupt it mid-sentence. */
+function fakeSynthesis() {
+  let current: { onend?: () => void; text: string } | null = null;
+  const synth = {
+    speaking: () => current !== null,
+    spoken: [] as string[],
+    speak(u: { onend?: () => void; text: string }) {
+      current = u;
+      if (u.text) synth.spoken.push(u.text);
+    },
+    cancel: vi.fn(() => {
+      const u = current;
+      current = null;
+      u?.onend?.();
+    }),
+    getVoices: () => [],
+  };
+  vi.stubGlobal("speechSynthesis", synth);
+  vi.stubGlobal(
+    "SpeechSynthesisUtterance",
+    class {
+      text: string;
+      constructor(text: string) {
+        this.text = text;
+      }
+    },
+  );
+  return synth;
+}
+
 describe("always-on voice assistant", () => {
   it("listens on load, wakes on 'Hey Matt' and answers the command", async () => {
     const instances: Recognition[] = [];
@@ -173,6 +217,68 @@ describe("always-on voice assistant", () => {
 
     // Still awake: a follow-up needs no wake phrase.
     say("system status");
+    expect(await screen.findByText(/All systems nominal/)).toBeInTheDocument();
+  });
+
+  it("stops talking the moment the owner says stop, then listens again", async () => {
+    const instances: Recognition[] = [];
+    class FakeRecognition {
+      continuous = false;
+      interimResults = false;
+      lang = "";
+      maxAlternatives = 1;
+      onresult: Recognition["onresult"] = null;
+      onerror: Recognition["onerror"] = null;
+      onend: Recognition["onend"] = null;
+      onstart: Recognition["onstart"] = null;
+      constructor() {
+        instances.push(this as unknown as Recognition);
+      }
+      start() {}
+      stop() {}
+      abort() {
+        this.onend?.();
+      }
+    }
+    vi.stubGlobal("webkitSpeechRecognition", FakeRecognition);
+    const synth = fakeSynthesis();
+    let release: (v: Response) => void = () => {};
+    tokenStore.set("tok");
+    const fetchMock = mockApi({ "/auth/me": OWNER, "/agents/summary": SUMMARY, "/health": HEALTH });
+    const realFetch = fetchMock.getMockImplementation();
+    fetchMock.mockImplementation(async (input, init) =>
+      String(input).includes("/command") ? new Promise<Response>((r) => (release = r)) : (realFetch?.(input, init) as Promise<Response>),
+    );
+
+    renderApp("/command-center");
+    expect(await screen.findByText("Listening for “Hey Matt”")).toBeInTheDocument();
+    const hear = (transcript: string, isFinal = true) => {
+      const rec = instances[instances.length - 1];
+      const event = { resultIndex: 0, results: { length: 1, 0: { isFinal, length: 1, 0: { transcript, confidence: 1 } } } };
+      act(() => rec?.onresult?.(event as RecognitionEvent));
+    };
+
+    // Mid-sentence: the mic is still open, and an interim "Matt stop" is enough.
+    hear("hey Matt how many agents do we have");
+    expect(await screen.findByText("Speaking")).toBeInTheDocument();
+    hear("you have 120 registered agents matt stop", false);
+    expect(synth.cancel).toHaveBeenCalled();
+    expect(synth.speaking()).toBe(false);
+    expect(await screen.findByText("Listening…")).toBeInTheDocument();
+    expect(screen.getByText("Stopped.")).toBeInTheDocument();
+
+    // While a command is still running: "cancel" drops its answer entirely.
+    hear("find gyms in Mysore");
+    expect(await screen.findByText("Thinking…")).toBeInTheDocument();
+    hear("cancel");
+    expect(await screen.findByText("Listening…")).toBeInTheDocument();
+    const reply = { reply: "On it, finding gyms.", intent: "website_opportunities", task_id: 4, data: {} };
+    await act(async () => release(new Response(JSON.stringify(reply), { status: 200, headers: { "Content-Type": "application/json" } })));
+    expect(screen.queryByText("On it, finding gyms.")).not.toBeInTheDocument();
+    expect(synth.spoken).not.toContain("On it, finding gyms.");
+
+    // And it still takes the next command.
+    hear("system status");
     expect(await screen.findByText(/All systems nominal/)).toBeInTheDocument();
   });
 

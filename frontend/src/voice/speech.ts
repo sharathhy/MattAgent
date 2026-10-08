@@ -57,6 +57,8 @@ function pickVoice(): SpeechSynthesisVoice | undefined {
  * Speak `text`. `onWord` fires on each word boundary so the brain can pulse in time.
  * Resolves when speech ends, or immediately if the browser blocks or lacks synthesis.
  */
+let cutOff: (() => void) | null = null;
+
 export function speak(text: string, onWord?: () => void): Promise<"spoken" | "blocked"> {
   if (!synthesisSupported()) return Promise.resolve("blocked");
   return new Promise((resolve) => {
@@ -71,11 +73,13 @@ export function speak(text: string, onWord?: () => void): Promise<"spoken" | "bl
     const finish = (r: "spoken" | "blocked") => {
       if (done) return;
       done = true;
+      cutOff = null;
       clearTimeout(guard);
       resolve(r);
     };
     // Some engines never fire `end`; never let the assistant hang on that.
     const guard = setTimeout(() => finish("spoken"), 1500 + text.length * 90);
+    cutOff = () => finish("spoken");
     u.onboundary = () => onWord?.();
     u.onend = () => finish("spoken");
     u.onerror = (e) => finish(e.error === "not-allowed" ? "blocked" : "spoken");
@@ -83,6 +87,8 @@ export function speak(text: string, onWord?: () => void): Promise<"spoken" | "bl
   });
 }
 
+/** Cut MATT off mid-sentence. Some engines never fire `end` after cancel, so settle `speak` here too. */
 export function stopSpeaking() {
   if (synthesisSupported()) window.speechSynthesis.cancel();
+  cutOff?.();
 }

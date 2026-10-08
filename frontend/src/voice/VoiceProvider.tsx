@@ -8,14 +8,14 @@ import { runCommand } from "./commands";
 import { startMic, type MicMonitor } from "./mic";
 import { recognitionCtor, speak, stopSpeaking, type Recognition } from "./speech";
 import { loadVoiceprint, voiceAccepted, type Voiceprint } from "./voiceprint";
-import { detectWake } from "./wake";
+import { detectWake, isStopPhrase } from "./wake";
 
 /**
  * MATT's voice loop:
  *   sleeping  — mic open, waiting for "Hey Matt"
  *   awake     — asked "what needs to be done?", listening for the command
  *   thinking  — running the command against the API
- *   speaking  — answering out loud (recognition paused so MATT doesn't hear itself)
+ *   speaking  — answering out loud; the mic stays open so "stop" or "Matt, be quiet" cuts it off
  * `idle` means the browser needs a tap before it will open the mic; `blocked` means the
  * mic permission was refused; `off` means the owner muted the always-on mic.
  */
@@ -56,8 +56,10 @@ interface VoiceApi {
   start(): void;
   /** Mute or unmute the always-on mic. */
   setEnabled(on: boolean): void;
-  /** Skip the wake phrase, e.g. from a tap on the brain. */
+  /** Skip the wake phrase, e.g. from a tap on the brain. A tap while MATT talks stops it instead. */
   wake(): void;
+  /** Cut off speech and drop the command in flight, then listen for the next one. */
+  interrupt(): void;
   submit(text: string): void;
   refreshVoiceprint(): void;
   /** Pause command handling while enrolling, so "Hey Matt" samples don't trigger it. */
@@ -69,6 +71,9 @@ const VoiceContext = createContext<VoiceApi | null>(null);
 const ENABLED_KEY = "matt.voice.enabled";
 const AWAKE_TIMEOUT_MS = 12_000;
 const LOCK_WINDOW_MS = 3_500;
+/** The recogniser can finalise MATT's own echo just after it stops talking; ignore that tail. */
+const ECHO_TAIL_MS = 900;
+const words = (t: string) => t.toLowerCase().replace(/[^a-z0-9₹\s]/g, " ").split(/\s+/).filter(Boolean);
 /**
  * Phones give the microphone to one user at a time: a level meter would starve speech
  * recognition there, so on mobile only recognition opens the mic.
@@ -108,7 +113,11 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   const recRef = useRef<Recognition | null>(null);
   const micRef = useRef<MicMonitor | null>(null);
   const wantListening = useRef(false);
-  const pausedForSpeech = useRef(false);
+  /** Bumped by every interrupt; work started under an older turn drops its result. */
+  const turn = useRef(0);
+  const lastSpoken = useRef<string[]>([]);
+  const spokeUntil = useRef(0);
+  const interruptRef = useRef<() => void>(() => {});
   const enrolling = useRef(false);
   const restartDelay = useRef(250);
   const awakeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -168,6 +177,14 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
         heardAt.current = performance.now();
         setProblem(null);
         let partial = "";
+        let heard = "";
+        for (let i = e.resultIndex; i < e.results.length; i++) heard += ` ${e.results[i]?.[0]?.transcript ?? ""}`;
+        // Barge-in: "stop" while MATT talks or works cuts it off at once, without waiting for a final result.
+        const busy = stateRef.current === "speaking" || stateRef.current === "thinking";
+        if (busy && !enrolling.current && isStopPhrase(heard, true)) {
+          interruptRef.current();
+          return;
+        }
         for (let i = e.resultIndex; i < e.results.length; i++) {
           const r = e.results[i];
           const text = r?.[0]?.transcript ?? "";
@@ -209,12 +226,12 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
         if (recRef.current !== rec) return;
         recRef.current = null;
         setInterim("");
-        if (!wantListening.current || pausedForSpeech.current) return;
+        if (!wantListening.current) return;
         // Chrome ends continuous sessions every minute or so; reopen quietly, backing off on failures.
         const delay = restartDelay.current;
         restartDelay.current = Math.min(delay * 2, 5000);
         setTimeout(() => {
-          if (wantListening.current && !pausedForSpeech.current) open();
+          if (wantListening.current) open();
         }, delay);
       };
       recRef.current = rec;
@@ -242,7 +259,6 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       // No analyser (e.g. no AudioContext): recognition still works, the brain just won't react to volume.
     }
     wantListening.current = true;
-    pausedForSpeech.current = false;
     if (["idle", "blocked", "off", "error"].includes(stateRef.current)) setState("sleeping");
     startRecognition();
   }, [Ctor, getMic, setState, startRecognition]);
@@ -265,30 +281,45 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     }, AWAKE_TIMEOUT_MS);
   }, [goToSleep, setState]);
 
+  /** Speak out loud. Resolves false if the owner cut MATT off. */
   const say = useCallback(
     async (text: string) => {
+      const mine = turn.current;
       setState("speaking");
-      pausedForSpeech.current = true;
-      recRef.current?.abort();
-      recRef.current = null;
       setInterim("");
+      lastSpoken.current = words(text);
       lastWord.current = performance.now();
       const result = await speak(text, () => {
         lastWord.current = performance.now();
       });
+      spokeUntil.current = performance.now();
       if (result === "blocked" && !warnedBlocked.current) {
         warnedBlocked.current = true;
         push("system", "Your browser blocked spoken replies. Tap anywhere on the page to allow them.");
       }
-      pausedForSpeech.current = false;
       if (wantListening.current) startRecognition();
+      return turn.current === mine;
     },
     [push, setState, startRecognition],
   );
 
+  const interrupt = useCallback(() => {
+    turn.current += 1;
+    stopSpeaking();
+    spokeUntil.current = performance.now();
+    setInterim("");
+    push("system", "Stopped.");
+    listenForCommand();
+    if (wantListening.current) startRecognition();
+  }, [listenForCommand, push, startRecognition]);
+  useEffect(() => {
+    interruptRef.current = interrupt;
+  }, [interrupt]);
+
   const execute = useCallback(
     async (command: string) => {
       clearTimeout(awakeTimer.current);
+      const mine = turn.current;
       push("you", command);
       setState("thinking");
       // The CEO agent can take a while; say so instead of looking frozen.
@@ -301,6 +332,8 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       } finally {
         clearTimeout(slow);
       }
+      // Told to stop while this was running: drop the answer and everything it would have done.
+      if (turn.current !== mine) return;
       if (outcome.navigate) navigate(outcome.navigate);
       // Commands like "start autopilot" change what the HUD shows; refresh it right away.
       void qc.invalidateQueries({ queryKey: ["autopilot"] });
@@ -323,7 +356,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
           }, ms),
         );
       }
-      await say(outcome.say);
+      if (!(await say(outcome.say))) return;
       if (outcome.logout) {
         wantListening.current = false;
         recRef.current?.abort();
@@ -339,8 +372,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   );
 
   const greet = useCallback(async () => {
-    await say(`Yes ${userName}? What needs to be done?`);
-    listenForCommand();
+    if (await say(`Yes ${userName}? What needs to be done?`)) listenForCommand();
   }, [listenForCommand, say, userName]);
 
   useEffect(() => {
@@ -348,6 +380,12 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       const text = raw.trim();
       const s = stateRef.current;
       if (!text || enrolling.current || s === "thinking" || s === "speaking") return;
+      // MATT hearing the end of its own reply is not a command.
+      if (performance.now() - spokeUntil.current < ECHO_TAIL_MS) {
+        const heard = words(text);
+        const said = ` ${lastSpoken.current.join(" ")} `;
+        if (heard.length > 0 && said.includes(` ${heard.join(" ")} `)) return;
+      }
       const wake = detectWake(text);
       if (s === "sleeping" && !wake) return;
       // The lock needs the level meter's spectrum; where there is none (phones) it can't judge, so it steps aside.
@@ -419,7 +457,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   // Chrome may drop recognition while the tab is hidden; reopen when it comes back.
   useEffect(() => {
     const onVisible = () => {
-      if (document.visibilityState === "visible" && wantListening.current && !pausedForSpeech.current) startRecognition();
+      if (document.visibilityState === "visible" && wantListening.current) startRecognition();
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
@@ -479,11 +517,14 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       start: () => void begin(),
       setEnabled,
       wake: () => {
-        if (stateRef.current === "thinking" || stateRef.current === "speaking") return;
-        void greet();
+        if (stateRef.current === "thinking" || stateRef.current === "speaking") interrupt();
+        else void greet();
       },
+      interrupt,
       submit: (text: string) => {
-        if (text.trim()) void execute(text.trim());
+        const busy = stateRef.current === "thinking" || stateRef.current === "speaking";
+        if (busy && isStopPhrase(text)) interrupt();
+        else if (text.trim()) void execute(text.trim());
       },
       refreshVoiceprint,
       setEnrolling: (on: boolean) => {
@@ -491,7 +532,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       },
       getMic,
     }),
-    [state, interim, log, problem, Ctor, signals, voiceprint, begin, setEnabled, greet, execute, refreshVoiceprint, getMic],
+    [state, interim, log, problem, Ctor, signals, voiceprint, begin, setEnabled, greet, interrupt, execute, refreshVoiceprint, getMic],
   );
 
   return <VoiceContext.Provider value={value}>{children}</VoiceContext.Provider>;

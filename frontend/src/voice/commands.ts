@@ -1,6 +1,7 @@
 import { api } from "../api/client";
 import { titleCase } from "../lib/format";
 import { NAV } from "../lib/navigation";
+import { isStopPhrase } from "./wake";
 
 /** What a command produced: something to say, and optionally somewhere to go. */
 export interface CommandOutcome {
@@ -64,7 +65,7 @@ export async function runCommand(raw: string, ctx: CommandContext): Promise<Comm
   const t = text.toLowerCase();
   if (!t) return { say: "I didn't catch that." };
 
-  if (/^(stop|cancel|never ?mind|go to sleep|sleep|that's all|thanks?( you)?|nothing)$/.test(t))
+  if (isStopPhrase(t) || /^(go to sleep|sleep|that's all|thanks?( you)?|nothing)$/.test(t))
     return { say: "Standing by.", sleep: true };
 
   if (isOutboundMoney(text)) return askAgents(text);
