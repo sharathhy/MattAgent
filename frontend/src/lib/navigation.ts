@@ -18,6 +18,7 @@ export const NAV: NavItem[] = [
   { path: "/analytics", label: "Analytics", description: "Performance analytics" },
   { path: "/opportunities", label: "Opportunities", description: "Opportunity engine" },
   { path: "/businesses", label: "Businesses", description: "Business discovery" },
+  { path: "/sales", label: "Sales Desk", description: "Ready offers to send and get paid" },
   { path: "/leads", label: "Leads", description: "Lead pipeline" },
   { path: "/customers", label: "Customers", description: "Customer records" },
   { path: "/products", label: "Products", description: "AI SaaS factory" },

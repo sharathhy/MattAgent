@@ -10,6 +10,7 @@ import { BusinessesPage } from "./pages/BusinessesPage";
 import { LeadsPage } from "./pages/LeadsPage";
 import { OpportunitiesPage } from "./pages/OpportunitiesPage";
 import { CustomersPage, ExperimentsPage, MemoryPage, ProductsPage, RevenuePage } from "./pages/RecordPages";
+import { SalesDeskPage } from "./pages/SalesDeskPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { TasksPage } from "./pages/TasksPage";
 import { ToolsPage } from "./pages/ToolsPage";
@@ -45,6 +46,7 @@ export function App() {
         <Route path="/analytics" element={<AnalyticsPage />} />
         <Route path="/opportunities" element={<OpportunitiesPage />} />
         <Route path="/businesses" element={<BusinessesPage />} />
+        <Route path="/sales" element={<SalesDeskPage />} />
         <Route path="/leads" element={<LeadsPage />} />
         <Route path="/customers" element={<CustomersPage />} />
         <Route path="/products" element={<ProductsPage />} />

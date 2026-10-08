@@ -9,7 +9,17 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import sessionmaker
 
 from app.api.middleware import request_context
-from app.api.routes import agents, audit, auth, business, changes, health, ops, payments
+from app.api.routes import (
+    agents,
+    audit,
+    auth,
+    business,
+    changes,
+    health,
+    ops,
+    payments,
+    sales,
+)
 from app.core.config import Settings, get_settings
 from app.core.google import GoogleTokenVerifier
 from app.core.logging import configure_logging
@@ -83,6 +93,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         business.router,
         payments.router,
         changes.router,
+        sales.router,
     ):
         app.include_router(router, prefix=settings.api_prefix)
     if settings.static_dir:

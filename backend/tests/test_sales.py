@@ -1,0 +1,64 @@
+from urllib.parse import unquote
+
+from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
+
+from app.core.config import Settings
+from app.models import Business, Lead, LedgerEntry
+
+UPI = "owner.test@ybl"  # placeholder; the real UPI ID lives only in Render
+
+
+def _lead(db: Session, **kw: object) -> Lead:
+    b = Business(name="Iron Gym", category="gyms", city="Mysuru", website="https://iron.example",
+                 public_phone="98450 12345", source="openstreetmap", source_ref="node/1",
+                 website_score=38, opportunity_score=81,
+                 audit={"findings": ["No mobile layout", "No contact button"]}, **kw)  # fmt: skip
+    db.add(b)
+    db.flush()
+    lead = Lead(business_id=b.id, status="qualified", service="Website redesign")
+    db.add(lead)
+    db.commit()
+    return lead
+
+
+def test_offer_goes_from_found_business_to_recorded_revenue(
+    client: TestClient, owner_headers: dict[str, str], viewer_headers: dict[str, str],
+    seeded: None, settings: Settings, db: Session,
+) -> None:  # fmt: skip
+    lead = _lead(db)
+    assert client.get("/api/sales", headers=viewer_headers).status_code == 403
+    desk = client.get("/api/sales", headers=owner_headers).json()
+    offer = desk["offers"][0]
+    assert not desk["upi_ready"] and offer["business"] == "Iron Gym"
+    assert "No mobile layout" in offer["message"] and "Reply STOP" in offer["message"]
+    assert offer["whatsapp_url"].startswith("https://wa.me/919845012345?text=")
+    assert offer["email_url"] is None and offer["payment"] is None
+
+    url = f"/api/sales/{lead.id}/price"
+    r = client.post(url, json={"amount_inr": 4999}, headers=owner_headers)
+    assert r.status_code == 400 and "where you get paid" in r.json()["detail"]
+    settings.upi_id = UPI
+    offer = client.post(url, json={"amount_inr": 4999}, headers=owner_headers).json()
+    assert offer["payment"]["upi_id"] == UPI and offer["price_inr"] == 4999
+    assert f"paid by UPI to {UPI}" in unquote(offer["whatsapp_url"])
+    offer = client.post(url, json={"amount_inr": 3999}, headers=owner_headers).json()
+    assert offer["price_inr"] == 3999  # re-pricing replaces the request
+
+    sent = client.post(f"/api/sales/{lead.id}/sent", headers=owner_headers).json()
+    assert sent["status"] == "contacted"
+    paid = client.post(f"/api/sales/{lead.id}/paid", headers=owner_headers).json()
+    assert paid["status"] == "won" and paid["payment"]["status"] == "received"
+    revenue = db.query(LedgerEntry).all()
+    assert [float(e.amount_inr) for e in revenue] == [3999.0]
+    assert client.get("/api/sales", headers=owner_headers).json()["offers"] == []  # won
+
+
+def test_businesses_without_public_contact_are_counted_not_listed(
+    client: TestClient, owner_headers: dict[str, str], seeded: None, db: Session
+) -> None:
+    lead = _lead(db)
+    lead.business.public_phone = None
+    db.commit()
+    desk = client.get("/api/sales", headers=owner_headers).json()
+    assert desk["offers"] == [] and desk["without_contact"] == 1

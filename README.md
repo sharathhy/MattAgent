@@ -36,6 +36,10 @@ What works today:
   work to the team (find leads, audit, research, assign a skill, run a bot). Skill bots work in
   parallel, one per connected free AI provider, each remembering its past experiments, and
   hand you ready-to-use earning steps. MATT never signs in to your accounts.
+- **Sales Desk (the path to a first payment):** each found business with a weak or missing
+  website gets a personal offer from its audit, a price you set and a UPI payment request in
+  your name. One tap opens WhatsApp or email on your own device with the message ready; MATT
+  sends nothing itself. Press Paid when the money arrives and it is recorded as revenue.
 - **Receive-only money (main rule):** customers pay the owner's own UPI ID directly through a
   payment request (QR code and `upi://pay` link). MATT never sends, transfers, withdraws or
   debits money, enforced in code; a payment counts as revenue once the owner confirms it. The

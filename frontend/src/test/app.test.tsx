@@ -336,3 +336,28 @@ describe("working pages", () => {
     expect(screen.getByText(/Fix: A 429 means/)).toBeInTheDocument();
   });
 });
+
+describe("sales desk", () => {
+  it("shows a ready offer with WhatsApp and payment details", async () => {
+    tokenStore.set("tok");
+    mockApi({
+      "/auth/me": OWNER,
+      "/sales": {
+        upi_ready: true, without_contact: 0,
+        offers: [{
+          lead_id: 1, business: "Iron Gym", category: "gyms", city: "Mysuru", website: "https://iron.example",
+          website_score: 38, opportunity_score: 81, findings: [], public_phone: "98450 12345", public_email: null,
+          status: "qualified", drafted_by_ai: false, price_inr: 4999, message: "Hello Iron Gym team", subject: "Hi",
+          whatsapp_url: "https://wa.me/919845012345?text=Hello", email_url: null,
+          payment: { id: 3, reference: "MATT000003", amount_inr: "4999.00", purpose: "x", customer_id: null, category: "websites",
+            status: "requested", upi_id: "owner.test@ybl", upi_link: null, qr_svg: null, bank: null, ledger_entry_id: null,
+            created_at: "2026-10-08T10:00:00Z", received_at: null },
+        }],
+      },
+    });
+    renderApp("/sales");
+    expect(await screen.findByText("Hello Iron Gym team")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /WhatsApp 98450 12345/ })).toHaveAttribute("href", "https://wa.me/919845012345?text=Hello");
+    expect(screen.getByRole("button", { name: "Paid ₹4999.00" })).toBeInTheDocument();
+  });
+});

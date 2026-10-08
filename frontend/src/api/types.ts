@@ -522,3 +522,31 @@ export interface AiTest {
   latency_ms?: number;
   error?: string;
 }
+
+/** One ready offer on the Sales desk: a found business, its personal message and payment. */
+export interface SalesOffer {
+  lead_id: number;
+  business: string;
+  category: string;
+  city: string | null;
+  website: string | null;
+  website_score: number | null;
+  opportunity_score: number | null;
+  findings: string[];
+  public_phone: string | null;
+  public_email: string | null;
+  status: string;
+  drafted_by_ai: boolean;
+  price_inr: number;
+  message: string;
+  subject: string;
+  whatsapp_url: string | null;
+  email_url: string | null;
+  payment: PaymentRequest | null;
+}
+
+export interface SalesDesk {
+  upi_ready: boolean;
+  offers: SalesOffer[];
+  without_contact: number;
+}
