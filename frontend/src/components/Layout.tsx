@@ -1,17 +1,31 @@
 import { Activity, LogOut } from "lucide-react";
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 
 import { useAuth } from "../lib/auth";
 import { NAV } from "../lib/navigation";
+import { VoiceProvider } from "../voice/VoiceProvider";
+import { BrainOrb } from "./BrainOrb";
 
 export function Layout() {
+  return (
+    <VoiceProvider>
+      <Shell />
+    </VoiceProvider>
+  );
+}
+
+function Shell() {
   const { user, logout } = useAuth();
+  const { pathname } = useLocation();
   return (
     <div className="flex min-h-screen">
-      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-line bg-slate-950/40 p-4 backdrop-blur md:flex">
-        <div className="mb-6 flex items-center gap-2 px-2">
-          <Activity className="h-5 w-5 text-accent" aria-hidden />
-          <span className="font-mono text-lg font-bold tracking-[0.3em] text-accent">MATT</span>
+      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-line bg-[#030b14]/80 p-4 backdrop-blur md:flex">
+        <div className="mb-6 flex items-center gap-2.5 px-2">
+          <span className="relative flex h-7 w-7 items-center justify-center">
+            <span className="absolute inset-0 animate-spin rounded-full border border-accent/30 border-t-accent [animation-duration:3s]" />
+            <Activity className="h-3.5 w-3.5 text-accent" aria-hidden />
+          </span>
+          <span className="hud-title text-lg font-bold">MATT</span>
         </div>
         <nav aria-label="Main" className="flex-1 space-y-0.5 overflow-y-auto">
           {NAV.map((item) => (
@@ -19,8 +33,10 @@ export function Layout() {
               key={item.path}
               to={item.path}
               className={({ isActive }) =>
-                `flex items-center justify-between rounded-md px-2 py-1.5 text-sm transition ${
-                  isActive ? "bg-accent/10 text-accent" : "text-slate-300 hover:bg-white/5"
+                `flex items-center justify-between border-l-2 px-3 py-1.5 text-[15px] font-medium tracking-wide transition ${
+                  isActive
+                    ? "border-accent bg-gradient-to-r from-accent/15 to-transparent text-accent"
+                    : "border-transparent text-slate-300 hover:border-accent/40 hover:bg-white/5 hover:text-cyan-100"
                 }`
               }
             >
@@ -58,6 +74,7 @@ export function Layout() {
         </nav>
         <Outlet />
       </main>
+      {pathname !== "/command-center" && <BrainOrb />}
     </div>
   );
 }

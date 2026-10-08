@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 
 import { api } from "../api/client";
-import { AutopilotPanel } from "./AutopilotPanel";
 import { Badge, inr } from "./kit";
 import { ErrorState, Stat } from "./ui";
 
@@ -15,7 +14,6 @@ export function LiveMetrics() {
   const leads = d ? Object.values(d.pipeline.leads_by_status).reduce((a, b) => a + b, 0) : 0;
   return (
     <div className="space-y-4">
-      <AutopilotPanel />
       <section aria-label="Business metrics" className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-5">
         <Stat label="Revenue Today" value={v(inr(d?.revenue.today_inr))} hint="Fact · recorded today" />
         <Stat label="Revenue This Month" value={v(inr(d?.revenue.month_inr))} hint="Fact · recorded in Revenue" />

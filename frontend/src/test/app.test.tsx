@@ -146,7 +146,10 @@ describe("command center", () => {
     expect(screen.getByText(/AI: free-tier models only/)).toBeInTheDocument();
     expect(screen.getByText(/2 skill-bot turns/)).toBeInTheDocument();
     expect(screen.getByRole("switch", { name: "Autopilot" })).toHaveAttribute("aria-checked", "true");
-    await waitFor(() => expect(screen.getByText(/System ok/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Core ok/)).toBeInTheDocument());
+    // HUD revenue panel: today's money and the skills earning it.
+    expect(screen.getByLabelText("Revenue today")).toHaveTextContent("₹5,000");
+    expect(screen.getByRole("region", { name: "Revenue" })).toHaveTextContent("Sales Copywriter");
   });
 });
 
