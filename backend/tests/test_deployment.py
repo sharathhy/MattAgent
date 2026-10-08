@@ -79,3 +79,9 @@ def test_spa_does_not_shadow_api_or_escape_root(spa: TestClient) -> None:
     assert spa.get("/api/nope").status_code == 404
     assert spa.get("/api/health").json()["database"] == "ok"
     assert "nope" not in spa.get("/..%2Fsecret.txt").text
+
+
+def test_web_pages_let_the_google_popup_report_back(spa: TestClient) -> None:
+    page = spa.get("/command-center")
+    assert page.headers["Cross-Origin-Opener-Policy"] == "same-origin-allow-popups"
+    assert "Cross-Origin-Opener-Policy" not in spa.get("/api/health").headers

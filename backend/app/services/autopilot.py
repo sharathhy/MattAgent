@@ -42,6 +42,10 @@ def get(db: Session) -> Autopilot:
         )  # fmt: skip
         db.add(row)
         db.commit()
+    elif not row.enabled and row.updated_by is None:
+        # Created as "off" by an earlier version and never paused by a person: switch it on.
+        row.enabled, row.next_cycle_at = True, datetime.now(UTC)
+        db.commit()
     return row
 
 

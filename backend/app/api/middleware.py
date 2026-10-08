@@ -61,4 +61,6 @@ async def request_context(
             response.headers["Content-Security-Policy"] = WEB_CSP
             # Google Sign-In checks the page origin, which "no-referrer" would hide.
             response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+            # The Google sign-in popup reports back with postMessage; allow that, nothing more.
+            response.headers["Cross-Origin-Opener-Policy"] = "same-origin-allow-popups"
     return response
