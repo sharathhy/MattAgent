@@ -3,18 +3,22 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { api } from "../api/client";
-import type { SalesOffer } from "../api/types";
+import type { SalesOffer, SalesService } from "../api/types";
 import { ActionError, Badge, Empty, PageHeader, useAction, useCan } from "../components/kit";
 import { ErrorState, Loading } from "../components/ui";
 
 /** The one path from a found business to a real payment: MATT prepares, you send, the customer pays you. */
 export function SalesDeskPage() {
   const desk = useQuery({ queryKey: ["sales"], queryFn: api.salesDesk, refetchInterval: 15000 });
+  const services = useQuery({ queryKey: ["sales-services"], queryFn: api.salesServices });
   return (
     <div className="space-y-5">
       <PageHeader eyebrow="Earn" title="Sales Desk" />
       <ol className="list-decimal space-y-1 pl-5 text-sm text-muted">
-        <li>MATT finds local businesses with weak or missing websites, builds each one a free demo website and writes a personal offer with its link.</li>
+        <li>
+          MATT finds local businesses, builds each one a free sample of a service (a demo website, a month of social posts,
+          a Google profile makeover, local SEO and more) and writes a personal offer with its link.
+        </li>
         <li>You set a price. MATT adds your UPI payment details to the offer.</li>
         <li>You press WhatsApp or Email. It opens on your own phone or email with the message ready; MATT sends nothing itself.</li>
         <li>When the customer pays you, press Paid. It is recorded as revenue. Then you deliver the work.</li>
@@ -32,19 +36,20 @@ export function SalesDeskPage() {
           {desk.data.without_contact > 0 && ` ${desk.data.without_contact} found businesses have no public phone or email.`}
         </Empty>
       )}
-      {desk.data?.offers.map((o) => <Offer key={o.lead_id} offer={o} />)}
+      {desk.data?.offers.map((o) => <Offer key={o.lead_id} offer={o} services={services.data ?? []} />)}
     </div>
   );
 }
 
-function Offer({ offer }: { offer: SalesOffer }) {
+function Offer({ offer, services }: { offer: SalesOffer; services: SalesService[] }) {
+  const [service, setService] = useState(services.find((s) => s.name === offer.service)?.slug ?? "website");
   const isOwner = useCan("owner");
   const [price, setPrice] = useState(offer.price_inr);
   const [copied, setCopied] = useState(false);
   const keys = [["sales"], ["revenue"], ["dashboard"]];
   const setPriceAction = useAction(() => api.priceOffer(offer.lead_id, price), keys);
   const sent = useAction(() => api.offerSent(offer.lead_id), keys);
-  const demo = useAction(() => api.buildDemo(offer.lead_id), keys);
+  const demo = useAction(() => api.buildDemo(offer.lead_id, service), keys);
   const paid = useAction(() => api.offerPaid(offer.lead_id), keys);
   const pay = offer.payment;
   return (
@@ -57,13 +62,23 @@ function Offer({ offer }: { offer: SalesOffer }) {
         {offer.website_score !== null && <span className="text-xs text-muted">website score {offer.website_score}/100 (estimate)</span>}
       </div>
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        {offer.demo_url ? (
-          <a className="text-accent underline" href={offer.demo_url} target="_blank" rel="noreferrer">Open the demo website</a>
-        ) : (
-          <span className="text-muted">No demo website yet.</span>
+        {offer.samples.map((x) => (
+          <a key={x.service} className="text-accent underline" href={x.url} target="_blank" rel="noreferrer">
+            Open free sample: {x.name}
+          </a>
+        ))}
+        {offer.samples.length === 0 && <span className="text-muted">No free sample yet.</span>}
+        {services.length > 0 && (
+          <select className="input w-auto py-1 text-xs" aria-label="Service" value={service} onChange={(e) => setService(e.target.value)}>
+            {services.map((x) => (
+              <option key={x.slug} value={x.slug}>
+                {x.name} (from ₹{x.price_inr})
+              </option>
+            ))}
+          </select>
         )}
         <button type="button" className="btn bg-slate-700 px-2.5 py-1 text-xs text-slate-100" disabled={demo.isPending} onClick={() => demo.mutate(undefined)}>
-          {demo.isPending ? "Building…" : offer.demo_url ? "Rebuild demo" : "Build free demo website"}
+          {demo.isPending ? "Building…" : "Build free sample"}
         </button>
       </div>
       <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-950/60 p-3 font-sans text-sm">{offer.message}</pre>

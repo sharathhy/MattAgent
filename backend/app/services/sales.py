@@ -74,11 +74,19 @@ def demo_url(db: Session, lead: Lead, base_url: str) -> str | None:
     return f"{base_url.rstrip('/')}/p/{row.title}" if row else None
 
 
+def sample_links(db: Session, lead: Lead, base_url: str) -> list[dict[str, str]]:
+    return [
+        {"service": svc.slug, "name": svc.name, "url": f"{base_url.rstrip('/')}/p/{row.title}"}
+        for svc, row in demo_sites.samples(db, lead)
+    ]
+
+
 def message(db: Session, settings: Settings, lead: Lead, base_url: str = "") -> str:
     text = (lead.outreach_draft or template_offer(lead)).strip()
     extra: list[str] = []
-    if url := demo_url(db, lead, base_url):
-        extra.append(f"I've already made a free demo website for {lead.business.name}: {url}")
+    for link in sample_links(db, lead, base_url):
+        what = "demo website" if link["service"] == "website" else f"sample ({link['name']})"
+        extra.append(f"I've already made a free {what} for {lead.business.name}: {link['url']}")
     pay = _request(db, lead)
     if pay is not None and pay.upi_id:
         extra.append(
@@ -100,14 +108,16 @@ def card(db: Session, settings: Settings, lead: Lead, base_url: str = "") -> dic
     body = "\n".join(ln for ln in text.splitlines() if not ln.startswith("Subject:")).strip()
     phone = _phone(b.public_phone)
     pay = _request(db, lead)
-    amount = pay.amount_inr if pay else lead.estimated_value_min_inr or DEFAULT_PRICE
+    svc = next((x for x in demo_sites.CATALOG if x.name == lead.service), None)
+    amount = (pay.amount_inr if pay else lead.estimated_value_min_inr
+              or (Decimal(svc.price_inr) if svc else DEFAULT_PRICE))  # fmt: skip
     return {
         "lead_id": lead.id, "business": b.name, "category": b.category, "city": b.city,
         "website": b.website, "website_score": b.website_score,
         "opportunity_score": b.opportunity_score,
         "findings": (b.audit or {}).get("findings", [])[:3],
         "public_phone": b.public_phone, "public_email": b.public_email,
-        "status": lead.status, "drafted_by_ai": bool(lead.outreach_draft),
+        "status": lead.status, "service": lead.service, "drafted_by_ai": bool(lead.outreach_draft),
         "price_inr": float(amount),
         "message": body, "subject": subject,
         "whatsapp_url": f"https://wa.me/{phone}?text={quote(body)}" if phone else None,
@@ -115,6 +125,7 @@ def card(db: Session, settings: Settings, lead: Lead, base_url: str = "") -> dic
                       if b.public_email else None),
         "payment": payments.out(db, pay, settings) if pay else None,
         "demo_url": demo_url(db, lead, base_url),
+        "samples": sample_links(db, lead, base_url),
     }  # fmt: skip
 
 
@@ -179,9 +190,16 @@ def mark_paid(db: Session, user: User, lead_id: int) -> Lead:
     return lead
 
 
-def make_demo(db: Session, router: Any, settings: Settings, lead_id: int) -> Lead:
+def make_demo(
+    db: Session, router: Any, settings: Settings, lead_id: int, service: str = "website"
+) -> Lead:
     lead = _lead(db, lead_id)
-    demo_sites.build(db, router, lead, settings.upi_payee_name)
-    events.emit(db, "sales.demo_built", lead_id=lead.id)
+    demo_sites.build_sample(db, router, lead, service, settings.upi_payee_name)
+    events.emit(db, "sales.sample_built", lead_id=lead.id, service=service)
     db.commit()
     return lead
+
+
+def catalog() -> list[dict[str, Any]]:
+    return [{"slug": s.slug, "name": s.name, "price_inr": s.price_inr, "sample": s.sample}
+            for s in demo_sites.CATALOG]  # fmt: skip

@@ -12,8 +12,18 @@ from app.services import sales
 router = APIRouter(prefix="/sales", tags=["sales"])
 
 
+class SampleIn(BaseModel):
+    service: str = Field(default="website", max_length=40)
+
+
 class PriceIn(BaseModel):
     amount_inr: Decimal = Field(ge=1, le=500_000, max_digits=12, decimal_places=2)
+
+
+@router.get("/services")
+def services(_: Operator) -> list[dict[str, Any]]:
+    """What MATT can sell, each with the free sample it builds first."""
+    return sales.catalog()
 
 
 @router.get("")
@@ -64,7 +74,9 @@ def build_demo(
     _: Operator,
     settings: AppSettings,
     model_router: Router,
+    body: SampleIn | None = None,
 ) -> dict[str, Any]:
-    """Build (or rebuild) the free demo website for this business and add its link."""
-    lead = sales.make_demo(db, model_router, settings, lead_id)
+    """Build (or rebuild) the free sample of a service for this business and add its link."""
+    service = body.service if body else "website"
+    lead = sales.make_demo(db, model_router, settings, lead_id, service)
     return sales.card(db, settings, lead, str(request.base_url))

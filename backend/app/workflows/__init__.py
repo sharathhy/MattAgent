@@ -189,12 +189,18 @@ def draft_outreach(ctx: Context, params: dict[str, Any]) -> dict[str, Any]:
     }  # fmt: skip
     from app.services import demo_sites
 
-    ctx.emit("workflow.step", step="demo", message=f"Building a free demo website for {b.name}")
-    demo_sites.build(ctx.db, ctx.router, lead, ctx.router.settings.upi_payee_name)
+    # Weak or missing website: sell a website. A decent one: sell a month of social posts.
+    slug = "website" if not b.website or (b.website_score or 0) < 60 else "social_media"
+    ctx.emit("workflow.step", step="sample", message=f"Building a free sample for {b.name}")
+    try:
+        demo_sites.build_sample(ctx.db, ctx.router, lead, slug, ctx.router.settings.upi_payee_name)
+    except ServiceError:
+        demo_sites.build(ctx.db, ctx.router, lead, ctx.router.settings.upi_payee_name)
+    context["service"] = lead.service
     objective = (
         "Write a short, honest, personalised B2B email to this business offering the service. "
-        "Say you have already made them a free demo website (the link is added under your "
-        "message; do not write a link yourself). "
+        "Say you have already made them a free sample of the service (the link is added under "
+        "your message; do not write a link yourself). "
         "Mention one or two specific findings. No hype, no false claims, no fake urgency, no "
         "promises of results. Include a clear one-line opt-out ('Reply STOP and I won't contact "
         "you again'). Give a subject line first as 'Subject: ...'. "

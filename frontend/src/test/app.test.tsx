@@ -342,6 +342,8 @@ describe("sales desk", () => {
     tokenStore.set("tok");
     mockApi({
       "/auth/me": OWNER,
+      "/sales/services": [{ slug: "website", name: "Website design", price_inr: 4999, sample: "demo" },
+        { slug: "social_media", name: "Social media posts for a month", price_inr: 2999, sample: "5 posts" }],
       "/sales": {
         upi_ready: true, without_contact: 0,
         offers: [{
@@ -352,7 +354,8 @@ describe("sales desk", () => {
           payment: { id: 3, reference: "MATT000003", amount_inr: "4999.00", purpose: "x", customer_id: null, category: "websites",
             status: "requested", upi_id: "owner.test@ybl", upi_link: null, qr_svg: null, bank: null, ledger_entry_id: null,
             created_at: "2026-10-08T10:00:00Z", received_at: null },
-          demo_url: "https://matt.example/p/abc123abc123abc123",
+          demo_url: "https://matt.example/p/abc123abc123abc123", service: "Website design",
+          samples: [{ service: "website", name: "Website design", url: "https://matt.example/p/abc123abc123abc123" }],
         }],
       },
     });
@@ -360,6 +363,6 @@ describe("sales desk", () => {
     expect(await screen.findByText("Hello Iron Gym team")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /WhatsApp 98450 12345/ })).toHaveAttribute("href", "https://wa.me/919845012345?text=Hello");
     expect(screen.getByRole("button", { name: "Paid ₹4999.00" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Open the demo website" })).toHaveAttribute("href", "https://matt.example/p/abc123abc123abc123");
+    expect(screen.getByRole("link", { name: "Open free sample: Website design" })).toHaveAttribute("href", "https://matt.example/p/abc123abc123abc123");
   });
 });

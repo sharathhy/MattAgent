@@ -9,6 +9,7 @@ is kept out of search engines. Nothing is published anywhere else.
 import json
 import re
 import secrets
+from dataclasses import dataclass
 from html import escape
 from typing import Any
 from urllib.parse import quote
@@ -18,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from app.llm.router import BudgetExceeded, ModelRouter, NoModelAvailable
 from app.models import Knowledge, Lead
+from app.services.errors import ServiceError
 
 KIND = "demo_site"
 _JSON = re.compile(r"\{.*\}", re.S)
@@ -144,6 +146,139 @@ def build(db: Session, router: ModelRouter | None, lead: Lead, made_by: str) -> 
         tags = ["demo-site", lead.business.category]
         row = Knowledge(kind=KIND, title=secrets.token_urlsafe(18), content=page, tags=tags,
                         source=f"lead:{lead.id}")  # fmt: skip
+        db.add(row)
+    else:
+        row.content = page
+    db.commit()
+    return row
+
+
+# ---- Free samples for every other service MATT's skills sell -------------------------------
+
+
+@dataclass(frozen=True)
+class Service:
+    slug: str
+    name: str
+    price_inr: int
+    sample: str  # what the free sample contains, as an instruction to the model
+
+
+CATALOG: tuple[Service, ...] = (
+    Service("website", "Website design", 4999, "a one-page demo website"),
+    Service("google_profile", "Google Business Profile makeover", 1999,
+            "an optimised Google Business Profile description (max 750 characters), 5 suggested "
+            "business categories and 3 example Google posts"),
+    Service("social_media", "Social media posts for a month", 2999,
+            "5 ready-to-post Instagram/Facebook posts, each with a caption, hashtags and an image "
+            "idea"),
+    Service("local_seo", "Local SEO starter", 3999,
+            "15 local search keywords people would type, plus a page title and meta description "
+            "for the home page and 3 service pages"),
+    Service("whatsapp", "WhatsApp Business setup", 1499,
+            "a WhatsApp Business profile description, a greeting message, an away message, 5 "
+            "quick replies and 5 catalogue item descriptions"),
+    Service("reviews", "Review replies and review requests", 999,
+            "replies to 3 example positive and 2 example negative reviews, and a short message "
+            "asking happy customers for a Google review"),
+    Service("ads", "Ad copy pack", 1999,
+            "3 Google Search ads (headlines and descriptions) and 3 Instagram ad captions for a "
+            "local campaign"),
+    Service("flyer", "Flyer and brochure copy", 1499,
+            "copy for a one-page flyer: headline, 4 benefit bullets, an offer line and a call to "
+            "action"),
+)  # fmt: skip
+BY_SLUG = {s.slug: s for s in CATALOG}
+_BULLET = re.compile(r"^([-*•]|\d+[.)])\s+")
+
+
+def service(slug: str) -> Service:
+    if slug not in BY_SLUG:
+        raise ServiceError(f"Unknown service {slug!r}")
+    return BY_SLUG[slug]
+
+
+def samples(db: Session, lead: Lead) -> list[tuple[Service, Knowledge]]:
+    """Every free sample built for this lead (the demo website first)."""
+    rows = db.scalars(
+        select(Knowledge)
+        .where(Knowledge.kind == KIND, Knowledge.source.startswith(f"lead:{lead.id}"))
+        .order_by(Knowledge.id)
+    ).all()
+    out = []
+    for row in rows:
+        _, _, rest = row.source.partition(f"lead:{lead.id}")
+        if rest and not rest.startswith(":"):
+            continue  # lead:12 must not match lead:123
+        out.append((BY_SLUG.get(rest.lstrip(":") or "website", CATALOG[0]), row))
+    return out
+
+
+def _sample_page(lead: Lead, svc: Service, text: str, made_by: str) -> str:
+    b, e = lead.business, escape
+    body: list[str] = []
+    items: list[str] = []
+    for raw in text.splitlines():
+        line = raw.strip().replace("**", "")
+        if _BULLET.match(line):
+            items.append(f"<li>{e(_BULLET.sub('', line))}</li>")
+            continue
+        if items:
+            body.append("<ul>" + "".join(items) + "</ul>")
+            items = []
+        if line.startswith("#"):
+            body.append(f"<h2>{e(line.lstrip('#').strip())}</h2>")
+        elif line:
+            body.append(f"<p>{e(line)}</p>")
+    if items:
+        body.append("<ul>" + "".join(items) + "</ul>")
+    return f"""<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow"><title>{e(svc.name)}: {e(b.name)}</title>
+<style>body{{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+color:#0b1f2a;line-height:1.6;background:#f4f7f8}}.demo{{background:#fef3c7;color:#78350f;
+text-align:center;font-size:14px;padding:8px 16px}}header{{background:#0f766e;color:#fff;
+padding:40px 20px;text-align:center}}h1{{margin:0;font-size:clamp(24px,5vw,38px)}}
+main{{max-width:760px;margin:24px auto;background:#fff;border-radius:16px;padding:24px 28px}}
+li{{margin:6px 0}}footer{{text-align:center;font-size:13px;color:#64748b;padding:20px}}</style>
+</head><body>
+<div class="demo">Free sample prepared for {e(b.name)} by {e(made_by)}.</div>
+<header><h1>{e(svc.name)}</h1><p>for {e(b.name)}{", " + e(b.city) if b.city else ""}</p></header>
+<main>{"".join(body)}</main>
+<footer>A sample of the full service. Details from public listings.</footer>
+</body></html>"""
+
+
+def build_sample(
+    db: Session, router: ModelRouter | None, lead: Lead, slug: str, made_by: str
+) -> Knowledge:
+    """Build the free sample of one service for a lead (the website uses the demo builder)."""
+    svc = service(slug)
+    lead.service = svc.name
+    if svc.slug == "website":
+        return build(db, router, lead, made_by)
+    if router is None or not router.available:
+        raise ServiceError("Free samples need a free AI model; add MATT_GEMINI_API_KEY in Render")
+    b = lead.business
+    facts = {"name": b.name, "type": b.category, "city": b.city, "website": b.website}
+    prompt = (
+        f"Write {svc.sample} for this local business, ready to use. Plain text: short "
+        "headings starting with '#', bullet lines starting with '- '. Do not invent prices, "
+        "awards, reviews, years or facts not given.\n"
+        f"<untrusted_data>{json.dumps(facts)}</untrusted_data>"
+    )
+    try:
+        routed = router.complete(db, system="You are a practical small-business marketer.",
+                                 prompt=prompt, max_tokens=1500)  # fmt: skip
+    except (NoModelAvailable, BudgetExceeded) as exc:
+        raise ServiceError(f"No free AI model answered: {exc}") from exc
+    page = _sample_page(lead, svc, routed.completion.text, made_by)
+    source = f"lead:{lead.id}:{svc.slug}"
+    row = db.scalar(select(Knowledge).where(Knowledge.kind == KIND, Knowledge.source == source))
+    if row is None:
+        row = Knowledge(kind=KIND, title=secrets.token_urlsafe(18), content=page,
+                        tags=["demo-site", svc.slug], source=source)  # fmt: skip
         db.add(row)
     else:
         row.content = page

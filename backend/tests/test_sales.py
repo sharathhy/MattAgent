@@ -86,3 +86,35 @@ def test_free_demo_website_is_built_hosted_and_offered(
 
     again = client.post(f"/api/sales/{lead.id}/demo", headers=owner_headers).json()
     assert again["demo_url"] == url  # rebuilding keeps the same link
+
+
+def test_free_samples_for_other_services(
+    client: TestClient, owner_headers: dict[str, str], seeded: None, settings: Settings,
+    db: Session,
+) -> None:  # fmt: skip
+    from app.llm.router import ModelRouter
+    from tests.fakes import free
+
+    catalog = client.get("/api/sales/services", headers=owner_headers).json()
+    assert {"website", "social_media", "google_profile", "local_seo"} <= {
+        c["slug"] for c in catalog
+    }
+    lead = _lead(db)
+    posts = "# Week 1\n- Post 1: <b>Leg day</b> #fitness\n2. Post 2: New batch timings"
+    client.app.state.model_router = ModelRouter(settings, providers=[free([posts])])  # type: ignore[attr-defined]
+    offer = client.post(f"/api/sales/{lead.id}/demo", json={"service": "social_media"},
+                        headers=owner_headers).json()  # fmt: skip
+    assert offer["service"] == "Social media posts for a month" and offer["price_inr"] == 2999
+    [sample] = offer["samples"]
+    assert sample["service"] == "social_media" and offer["demo_url"] is None
+    assert (
+        f"free sample (Social media posts for a month) for Iron Gym: {sample['url']}"
+        in offer["message"]
+    )
+    html = client.get(sample["url"].removeprefix("http://testserver")).text
+    assert "<h2>Week 1</h2>" in html and "&lt;b&gt;Leg day&lt;/b&gt;" in html
+    assert "<li>Post 2: New batch timings</li>" in html
+
+    r = client.post(f"/api/sales/{lead.id}/demo", json={"service": "bitcoin"},
+                    headers=owner_headers)  # fmt: skip
+    assert r.status_code == 400

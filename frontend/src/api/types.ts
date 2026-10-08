@@ -545,6 +545,16 @@ export interface SalesOffer {
   payment: PaymentRequest | null;
   /** Preview link of the free demo website MATT built for this business. */
   demo_url: string | null;
+  /** Every free sample built for this business, one per service. */
+  samples: { service: string; name: string; url: string }[];
+  service: string;
+}
+
+export interface SalesService {
+  slug: string;
+  name: string;
+  price_inr: number;
+  sample: string;
 }
 
 export interface SalesDesk {
