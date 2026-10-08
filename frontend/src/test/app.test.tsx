@@ -114,6 +114,13 @@ const DASHBOARD = {
   opportunities: [],
 };
 
+const AUTOPILOT = {
+  enabled: true, cities: ["Mysuru"], categories: ["gyms"], interval_minutes: 30, daily_outreach_drafts: 5,
+  last_cycle_at: null, next_cycle_at: null, last_action: "Find gyms in Mysuru and rank website opportunities",
+  cycles_today: 3, active: 1, ai_model_available: false, available_categories: ["gyms", "clinics"],
+  recent: [], latest_report: null,
+};
+
 describe("command center", () => {
   it("shows live numbers computed from records", async () => {
     tokenStore.set("tok");
@@ -121,6 +128,7 @@ describe("command center", () => {
       "/auth/me": OWNER,
       "/agents/summary": SUMMARY,
       "/dashboard": DASHBOARD,
+      "/autopilot": AUTOPILOT,
       "/health": { status: "ok", database: "ok", env: "test" },
     });
     renderApp("/command-center");
@@ -133,6 +141,8 @@ describe("command center", () => {
     expect(screen.getByText("Pipeline").parentElement).toHaveTextContent(/Assumption/);
     expect(screen.getByText("AI Cost Today").parentElement).toHaveTextContent("No AI model key set");
     expect(screen.getByText("Find gyms in Mysore")).toBeInTheDocument();
+    expect(await screen.findByText("Autopilot on")).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "Autopilot" })).toHaveAttribute("aria-checked", "true");
     await waitFor(() => expect(screen.getByText(/System ok/)).toBeInTheDocument());
   });
 });

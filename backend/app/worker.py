@@ -15,10 +15,11 @@ from app.core.domain import TaskStatus
 from app.db.base import utcnow
 from app.llm.router import ModelRouter
 from app.models import Knowledge, Task
-from app.services import tasks
+from app.services import autopilot, tasks
 
 log = logging.getLogger(__name__)
 HOUSEKEEPING_EVERY = timedelta(minutes=10)
+AUTOPILOT_EVERY = timedelta(seconds=15)
 
 
 class Worker:
@@ -43,6 +44,7 @@ class Worker:
 
     def _run(self) -> None:
         last_housekeeping = utcnow() - HOUSEKEEPING_EVERY
+        last_autopilot = utcnow() - AUTOPILOT_EVERY
         while not self._stop.is_set():
             try:
                 with self.factory() as db:
@@ -50,6 +52,9 @@ class Worker:
                         db.execute(delete(Knowledge).where(Knowledge.expires_at < utcnow()))
                         db.commit()
                         last_housekeeping = utcnow()
+                    if utcnow() - last_autopilot >= AUTOPILOT_EVERY:
+                        autopilot.tick(db, self.router)
+                        last_autopilot = utcnow()
                     worked = tasks.process_next(db, self.router) is not None
             except Exception:
                 log.exception("worker loop error")

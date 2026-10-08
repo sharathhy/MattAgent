@@ -5,11 +5,12 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Query, status
 from sqlalchemy import select
 
-from app.api.deps import Admin, AppSettings, CurrentUser, DbSession, Operator, Router
+from app.api.deps import Admin, AppSettings, CurrentUser, DbSession, Operator, Owner, Router
 from app.models import Task, Tool
 from app.schemas.ops import (
     ApprovalDecision,
     ApprovalOut,
+    AutopilotUpdate,
     CommandRequest,
     CommandResponse,
     EventOut,
@@ -19,7 +20,7 @@ from app.schemas.ops import (
     WorkflowInfo,
     WorkflowRunRequest,
 )
-from app.services import approvals, command, dashboard, events, tasks
+from app.services import approvals, autopilot, command, dashboard, events, tasks
 from app.workflows import WORKFLOWS
 
 router = APIRouter(tags=["operations"])
@@ -167,3 +168,23 @@ def get_settings_view(_: Admin, settings: AppSettings, model_router: Router) -> 
         "worker_enabled": settings.worker_enabled,
         "email_sending": False,
     }
+
+
+@router.get("/autopilot")
+def get_autopilot(db: DbSession, _: CurrentUser, model_router: Router) -> dict[str, Any]:
+    return autopilot.status(db, model_router)
+
+
+@router.put("/autopilot")
+def update_autopilot(
+    body: AutopilotUpdate, db: DbSession, user: Owner, model_router: Router
+) -> dict[str, Any]:
+    """Only the owner can switch MATT's self-directed work on or off, or retarget it."""
+    autopilot.update(db, user, body.model_dump(exclude_none=True))
+    return autopilot.status(db, model_router)
+
+
+@router.post("/autopilot/run", response_model=TaskOut | None)
+def run_autopilot_now(db: DbSession, _: Admin, model_router: Router) -> TaskOut | None:
+    task = autopilot.tick(db, model_router, force=True)
+    return _task_out(task) if task else None

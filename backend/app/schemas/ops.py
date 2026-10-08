@@ -105,3 +105,11 @@ class EventOut(BaseModel):
     type: str
     payload: dict[str, Any]
     created_at: datetime
+
+
+class AutopilotUpdate(BaseModel):
+    enabled: bool | None = None
+    cities: list[str] | None = Field(default=None, min_length=1, max_length=20)
+    categories: list[str] | None = Field(default=None, min_length=1, max_length=16)
+    interval_minutes: int | None = Field(default=None, ge=10, le=1440)
+    daily_outreach_drafts: int | None = Field(default=None, ge=0, le=50)

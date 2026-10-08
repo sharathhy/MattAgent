@@ -315,6 +315,7 @@ export interface Earnings {
 
 export interface Dashboard {
   earnings: Earnings;
+  autopilot: Pick<AutopilotStatus, "enabled" | "last_action" | "last_cycle_at" | "next_cycle_at" | "cycles_today" | "active" | "ai_model_available">;
   revenue: {
     truth: string;
     today_inr: number;
@@ -375,4 +376,21 @@ export interface SystemSettings {
   monthly_ai_budget_inr: number;
   worker_enabled: boolean;
   email_sending: boolean;
+}
+
+export interface AutopilotStatus {
+  enabled: boolean;
+  cities: string[];
+  categories: string[];
+  interval_minutes: number;
+  daily_outreach_drafts: number;
+  last_cycle_at: string | null;
+  next_cycle_at: string | null;
+  last_action: string | null;
+  cycles_today: number;
+  active: number;
+  ai_model_available: boolean;
+  available_categories: string[];
+  recent: { task_id: number; action: string; status: TaskStatus; result: string | null; created_at: string }[];
+  latest_report: { title: string; content: string; created_at: string } | null;
 }

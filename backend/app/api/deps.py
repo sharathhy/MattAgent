@@ -55,3 +55,4 @@ def get_model_router(request: Request) -> ModelRouter:
 Router = Annotated[ModelRouter, Depends(get_model_router)]
 Operator = Annotated[User, Depends(require_role(Role.OPERATOR))]
 Admin = Annotated[User, Depends(require_role(Role.ADMIN))]
+Owner = Annotated[User, Depends(require_role(Role.OWNER))]

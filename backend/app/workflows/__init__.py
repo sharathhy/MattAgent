@@ -261,3 +261,80 @@ def run_workflow(ctx: Context, slug: str, params: dict[str, Any]) -> dict[str, A
     if entry is None:
         raise NotFoundError(f"Unknown workflow {slug!r}")
     return entry[1](ctx, params)
+
+
+def daily_report(ctx: Context, params: dict[str, Any]) -> dict[str, Any]:
+    """The CEO's daily report: facts from the records, plus recommendations when a model is
+    available. Saved to memory so it can be read later."""
+    from datetime import timedelta
+
+    from sqlalchemy import func
+
+    from app.core.domain import TaskStatus
+    from app.models import Knowledge, Task
+    from app.services import earnings
+
+    tz = ctx.router.settings.timezone
+    since = datetime.now(UTC) - timedelta(days=1)
+    e = earnings.summary(ctx.db, tz, days=1)
+
+    def count(model: Any, *where: Any) -> int:
+        return int(ctx.db.scalar(select(func.count()).select_from(model).where(*where)) or 0)
+
+    facts = {
+        "date": e["date"],
+        "revenue_today_inr": e["today_inr"],
+        "revenue_month_inr": e["month_inr"],
+        "new_businesses_24h": count(Business, Business.created_at >= since),
+        "new_leads_24h": count(Lead, Lead.created_at >= since),
+        "leads_total": count(Lead),
+        "approvals_pending": count(Approval, Approval.status == ApprovalStatus.PENDING),
+        "tasks_done_24h": count(
+            Task, Task.status == TaskStatus.SUCCEEDED, Task.finished_at >= since
+        ),
+        "tasks_failed_24h": count(
+            Task, Task.status == TaskStatus.FAILED, Task.finished_at >= since
+        ),
+        "top_opportunities": [
+            f"{o.title} ({o.score:.0f}, estimate)"
+            for o in ctx.db.scalars(select(Opportunity).order_by(Opportunity.score.desc()).limit(3))
+        ],
+    }
+    lines = [
+        f"CEO report for {facts['date']} (facts from MATT's records)",
+        f"- Revenue today {facts['revenue_today_inr']:,.0f} INR, this month "
+        f"{facts['revenue_month_inr']:,.0f} INR.",
+        f"- Last 24h: {facts['new_businesses_24h']} businesses found, {facts['new_leads_24h']} new "
+        f"leads ({facts['leads_total']} total), {facts['tasks_done_24h']} tasks done, "
+        f"{facts['tasks_failed_24h']} failed.",
+        f"- Waiting for your approval: {facts['approvals_pending']}.",
+    ]
+    if facts["top_opportunities"]:
+        lines.append("- Top opportunities: " + "; ".join(facts["top_opportunities"]) + ".")
+    if ctx.router.available:
+        ctx.emit("workflow.step", step="report", message="CEO is writing recommendations")
+        result = runtime.run(
+            ctx.db, ctx.router, _agent(ctx.db, "ceo"),
+            "Using only these facts, give the owner 3 short, concrete RECOMMENDATIONS for today "
+            "that move toward the first or next paying customer. No invented numbers.",
+            context=facts, task_id=ctx.task_id, override_budget=ctx.override_budget,
+        )  # fmt: skip
+        lines += ["", "Recommendations:", result.text]
+    else:
+        lines += ["", "Add an AI model key for written recommendations."]
+    report = "\n".join(lines)
+    note = Knowledge(
+        kind="report", title=f"CEO report {facts['date']}", content=report,
+        tags=["report", "autopilot"], agent_slug="ceo", source="autopilot",
+    )  # fmt: skip
+    ctx.db.add(note)
+    ctx.db.commit()
+    ctx.emit("report.ready", knowledge_id=note.id, title=note.title)
+    return {"summary": lines[1], "report": report, "knowledge_id": note.id, "facts": facts}
+
+
+WORKFLOWS["daily_report"] = (
+    "Write the CEO's daily report from MATT's records, with recommendations when AI is on.",
+    daily_report,
+    False,
+)
