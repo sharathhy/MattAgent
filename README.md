@@ -10,18 +10,32 @@ touches sensitive data or changes infrastructure.
 
 ## Status
 
-Built incrementally per the [roadmap](docs/roadmap.md). **Phase 1 (foundation) is done.**
+Built incrementally per the [roadmap](docs/roadmap.md). Phases 1 and 2 are done, with the
+first working pieces of phases 3 to 5.
 
-| Works today | Not built yet (shown as "Coming soon" in the UI) |
-| --- | --- |
-| FastAPI backend, PostgreSQL/SQLite, Alembic migrations | Task execution, workflows, tool registry, event bus (Phase 2) |
-| Owner bootstrap, JWT auth, RBAC (owner/admin/operator/viewer) | Approval Center, analytics (Phase 3) |
-| Agent registry: CEO, 9 executives, 100 skills, 10 self-upgrade skills | Opportunities, leads, website auditing (Phase 4) |
-| Lifecycle state machine, owner-only permission changes, versioning | Revenue engines, experiments (Phase 5) |
-| Audit log, structured JSON logs with request ids, security headers | Voice (Phase 6), Skill Factory / AI University (Phase 7) |
-| Command Center, Workforce Map, Agents, Agent detail, Audit Log pages | Production hardening (Phase 8) |
+What works today:
 
-No agent executes work yet, so the UI shows no agent activity, revenue or customers.
+- **Agents that do work.** Any of the 120 registered agents can take an objective. The CEO and
+  executives can delegate to their teams. Work runs on a database-backed queue with retries and
+  exponential backoff; failures are recorded, never hidden.
+- **Free-first model router.** Gemini free tier, Groq, local Ollama, then Claude only if you opt
+  in. Paid models stop at your daily and monthly INR budget and ask you in Approvals.
+- **Website opportunity pipeline.** Discover businesses on OpenStreetMap by city and category,
+  audit their websites (UX, design, SEO, mobile, performance, conversion, technical), rank leads,
+  and draft outreach that waits for your approval.
+- **Opportunity engine** with the spec's scoring formula, manual or AI-researched.
+- **Command endpoint** for typed or spoken commands, an event feed, a live dashboard and
+  analytics computed from stored records.
+- **Business records:** customers, products, a revenue and expense ledger (facts you enter),
+  experiments, and memory with retention.
+- Auth with Google or password, RBAC, audit log, approval gate for risky actions.
+
+Not built yet: sending email (approved drafts are marked ready for you to send), web search,
+CRM/calendar/GitHub integrations, the Skill Factory and AI University (Phase 7), and production
+hardening (Phase 8). The Tools page lists each one as not connected.
+
+Without an AI key, MATT still discovers and audits businesses, scores opportunities and tracks
+records; anything that needs reasoning says so plainly.
 
 ## Quick start (development)
 
@@ -70,7 +84,12 @@ backend/
     models/       SQLAlchemy models
     repositories/ query functions
     schemas/      request/response models
-    services/     business rules (registry, auth, audit)
+    services/     business rules (registry, auth, tasks, approvals, command, dashboard)
+    agents/       agent runtime: prompts, untrusted-data fencing, delegation
+    llm/          model providers and the free-first budgeted router
+    plugins/      tools: website auditor, business discovery, web fetch
+    workflows/    code-defined workflows
+    worker.py     background task worker
     registry/     workforce catalog (data/workforce.yaml) and its loader
   migrations/     Alembic
   tests/

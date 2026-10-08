@@ -97,9 +97,7 @@ export async function runCommand(raw: string, ctx: CommandContext): Promise<Comm
 
   const page = findPage(t);
   if (page && (has(t, "open", "show", "go to", "take me", "navigate", "display", "bring up") || t === page.label.toLowerCase())) {
-    return page.phase
-      ? { say: `Opening ${page.label}. That module isn't built yet.`, navigate: page.path }
-      : { say: `Opening ${page.label}.`, navigate: page.path };
+    return { say: `Opening ${page.label}.`, navigate: page.path };
   }
 
   if (has(t, "executives", "executive team", "leadership", "c-suite")) {

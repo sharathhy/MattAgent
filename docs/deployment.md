@@ -27,6 +27,23 @@ after a fixed period, so upgrade the database plan before relying on the data.
 Without `MATT_BOOTSTRAP_TOKEN`, a production deployment disables password sign-up; the owner
 signs in with Google (below) or is created with `matt create-owner`.
 
+## AI models
+
+MATT's agents need at least one model key. The cheapest is free:
+
+1. Create a key at https://aistudio.google.com/apikey (Gemini free tier).
+2. In Render, open the `matt` service, then Environment, and set `MATT_GEMINI_API_KEY`.
+   Never paste keys into chat, issues or the repository.
+
+Optional: `MATT_GROQ_API_KEY` (free tier), `MATT_OLLAMA_URL` (your own server), and
+`MATT_ANTHROPIC_API_KEY` with `MATT_ALLOW_PREMIUM_MODELS=true` for Claude. Claude calls use the
+API's server-side fallback, so a refused request is retried once on a fallback model.
+Paid models run only within `MATT_DAILY_AI_BUDGET_INR` and `MATT_MONTHLY_AI_BUDGET_INR`
+(default 0, so they never run without your approval).
+
+The worker runs inside the web service. On Render's free plan the service sleeps when idle, so
+queued work pauses until the next visit wakes it; anything left running is re-queued on start.
+
 ## Sign in with Google
 
 Only the OAuth **client ID** is needed, and it is not a secret.
@@ -77,5 +94,5 @@ test restores. Phase 8 automates this.
   `duration_ms` for every request. Ship stdout to any log store (Loki, CloudWatch, etc.). Every
   response carries `X-Request-ID` for correlation.
 - **Audit:** `GET /api/audit-logs` (admin) or the Audit Log page.
-- Metrics, tracing and cost tracking arrive with the orchestrator (Phase 2) and hardening
-  (Phase 8).
+- **AI cost and reliability:** every model call is stored in `model_usage` (tokens, INR cost,
+  latency, errors) and summarised on the Analytics page. Tracing arrives with hardening (Phase 8).

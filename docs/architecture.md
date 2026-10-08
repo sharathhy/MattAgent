@@ -6,7 +6,7 @@
 - Clean layering in the backend: `api` → `services` → `repositories` → `models`. Routes hold no
   business rules; services raise typed `ServiceError`s that map to HTTP status codes.
 - Everything that changes state writes an `audit_logs` row in the same transaction.
-- Facts only. Metrics are NULL until measured; the UI says "No data yet" or "Coming soon".
+- Facts only. Metrics are NULL until measured; the UI says "No data yet", and tools that are not connected are labelled as such.
 
 ## Data model (Phase 1)
 
@@ -52,6 +52,13 @@ agent's permissions (versioned and audited); no API path lets an agent change it
 
 ## Frontend
 
-React 19 + TypeScript (strict) + Tailwind 4 + TanStack Query + React Router. Pages from later
-phases are routed to a "Coming soon" screen driven by `src/lib/navigation.ts`, so the navigation
-always reflects what is real.
+React 19 + TypeScript (strict) + Tailwind 4 + TanStack Query + React Router. Every page in
+`src/lib/navigation.ts` is backed by a live API; lists refresh by polling.
+
+## Orchestration
+
+`POST /api/command` maps clear requests ("find gyms in Mysore", "audit example.com", "status")
+to deterministic workflows and sends everything else to the CEO agent, which may delegate with
+`DELEGATE <slug>: <objective>` lines to its direct reports. Tasks are rows in `tasks`, claimed by
+the worker (`SELECT ... FOR UPDATE SKIP LOCKED` on PostgreSQL), executed through the model
+router, and recorded with model, tokens and INR cost. Every step writes to `events`.

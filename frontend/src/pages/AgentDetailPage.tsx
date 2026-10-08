@@ -60,7 +60,7 @@ export function AgentDetailPage() {
             <Row k="Tasks failed" v={a.tasks_failed} />
             <Row k="Revenue contribution" v={`₹${a.revenue_contribution}`} />
           </dl>
-          <p className="mt-3 text-xs text-muted">Recorded facts only. Task execution starts in Phase 2.</p>
+          <p className="mt-3 text-xs text-muted">Recorded facts only, updated as this agent finishes tasks.</p>
         </Panel>
         <Panel title="Permissions">
           <Tags items={a.permissions} />

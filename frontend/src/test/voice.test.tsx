@@ -49,11 +49,11 @@ describe("commands", () => {
     expect((await runCommand("system status", ctx)).say).toContain("All systems nominal");
   });
 
-  it("opens pages and flags unbuilt ones", async () => {
+  it("opens pages", async () => {
     expect(await runCommand("open the workforce map", ctx)).toMatchObject({ navigate: "/workforce" });
     const tasks = await runCommand("show me tasks", ctx);
     expect(tasks.navigate).toBe("/tasks");
-    expect(tasks.say).toContain("isn't built yet");
+    expect(tasks.say).toBe("Opening Tasks.");
   });
 
   it("hands real work to the backend agents", async () => {

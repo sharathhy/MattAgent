@@ -1,13 +1,24 @@
 import type {
   AgentDetail,
-  AuthStatus,
   AgentSummary,
+  Analytics,
+  Approval,
   AuditLog,
+  AuthStatus,
+  Business,
   CommandResponse,
+  Dashboard,
   Health,
   HierarchyNode,
+  Lead,
+  MattEvent,
+  Opportunity,
   RegistrySummary,
+  SystemSettings,
+  Task,
+  Tool,
   User,
+  WorkflowInfo,
 } from "./types";
 
 const TOKEN_KEY = "matt.token";
@@ -48,11 +59,26 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const detail = typeof body.detail === "string" ? body.detail : `Request failed (${res.status})`;
     throw new ApiError(res.status, detail);
   }
+  if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }
 
 const post = <T>(path: string, body: unknown) =>
   request<T>(path, { method: "POST", body: JSON.stringify(body) });
+const send = <T>(method: "PUT" | "PATCH", path: string, body: unknown) =>
+  request<T>(path, { method, body: JSON.stringify(body) });
+
+const query = (params: Record<string, string | number | undefined>) => {
+  const qs = new URLSearchParams(
+    Object.entries(params)
+      .filter(([, v]) => v !== undefined && v !== "")
+      .map(([k, v]) => [k, String(v)]),
+  ).toString();
+  return qs ? `?${qs}` : "";
+};
+
+/** Simple record collections served by the generic CRUD endpoints. */
+export type Collection = "customers" | "products" | "ledger" | "experiments" | "knowledge";
 
 export interface AgentFilters {
   kind?: string;
@@ -82,5 +108,44 @@ export const api = {
   registrySummary: () => request<RegistrySummary>("/agents/summary"),
   hierarchy: () => request<HierarchyNode[]>("/agents/hierarchy"),
   auditLogs: () => request<AuditLog[]>("/audit-logs"),
+
   command: (text: string) => post<CommandResponse>("/command", { text }),
+  dashboard: () => request<Dashboard>("/dashboard"),
+  analytics: () => request<Analytics>("/analytics"),
+  events: (afterId = 0) => request<MattEvent[]>(`/events${query({ after_id: afterId })}`),
+  settings: () => request<SystemSettings>("/settings"),
+
+  tasks: (filters: { status?: string; agent?: string } = {}) => request<Task[]>(`/tasks${query(filters)}`),
+  task: (id: number) => request<Task>(`/tasks/${id}`),
+  createTask: (body: { objective: string; agent_slug: string; priority?: number }) => post<Task>("/tasks", body),
+  cancelTask: (id: number) => post<Task>(`/tasks/${id}/cancel`, {}),
+  retryTask: (id: number) => post<Task>(`/tasks/${id}/retry`, {}),
+
+  workflows: () => request<WorkflowInfo[]>("/workflows"),
+  runWorkflow: (slug: string, params: Record<string, unknown>) => post<Task>(`/workflows/${slug}/run`, { params }),
+  tools: () => request<Tool[]>("/tools"),
+
+  approvals: (status?: string) => request<Approval[]>(`/approvals${query({ status })}`),
+  decideApproval: (id: number, approve: boolean, note?: string) =>
+    post<Approval>(`/approvals/${id}/decide`, { approve, note: note ?? null }),
+
+  businesses: (filters: { city?: string; category?: string; q?: string } = {}) =>
+    request<Business[]>(`/businesses${query(filters)}`),
+  auditBusiness: (id: number) => post<Task>(`/businesses/${id}/audit`, {}),
+  deleteBusiness: (id: number) => request<undefined>(`/businesses/${id}`, { method: "DELETE" }),
+  leads: (status?: string) => request<Lead[]>(`/leads${query({ status })}`),
+  updateLead: (id: number, body: Partial<Pick<Lead, "status" | "next_action" | "notes">>) =>
+    send<Lead>("PATCH", `/leads/${id}`, body),
+  draftOutreach: (id: number) => post<Task>(`/leads/${id}/draft-outreach`, {}),
+  opportunities: () => request<Opportunity[]>("/opportunities"),
+  createOpportunity: (body: { title: string; category: string; description: string; factors: Record<string, number>; evidence?: string }) =>
+    post<Opportunity>("/opportunities", body),
+  updateOpportunity: (id: number, body: { status?: string; factors?: Record<string, number> }) =>
+    send<Opportunity>("PATCH", `/opportunities/${id}`, body),
+
+  list: <T>(collection: Collection) => request<T[]>(`/${collection}`),
+  create: <T>(collection: Collection, body: Record<string, unknown>) => post<T>(`/${collection}`, body),
+  update: <T>(collection: Collection, id: number, body: Record<string, unknown>) =>
+    send<T>("PUT", `/${collection}/${id}`, body),
+  remove: (collection: Collection, id: number) => request<undefined>(`/${collection}/${id}`, { method: "DELETE" }),
 };
