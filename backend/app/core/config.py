@@ -36,6 +36,21 @@ class Settings(BaseSettings):
     #: Built frontend to serve from the API process (single-service deployments).
     static_dir: str | None = None
 
+    #: The public address of this deployment, for links in emails. Render sets
+    #: RENDER_EXTERNAL_URL itself, which is used when this is blank.
+    public_url: str | None = None
+    # --- Outgoing email for offers. Render's free plan blocks SMTP ports, so the Brevo HTTPS
+    # API (free: 300 emails a day) is used when its key is set; SMTP works on paid hosts. ---
+    mail_from: str | None = None
+    brevo_api_key: str | None = None
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_username: str | None = None
+    smtp_password: str | None = None
+    #: Offers the sales agent may email per day by itself (0 switches automatic sending off).
+    #: Kept small on purpose: one personal note per business, never bulk mail.
+    auto_send_daily_cap: int = Field(default=10, ge=0, le=50)
+
     # --- AI model router (free-first). Keys come only from the environment. ---
     gemini_api_key: str | None = None
     #: Alias Google keeps pointed at its current free-tier Flash model.
@@ -97,6 +112,12 @@ class Settings(BaseSettings):
         "github_token",
         "ollama_url",
         "anthropic_api_key",
+        "public_url",
+        "mail_from",
+        "brevo_api_key",
+        "smtp_host",
+        "smtp_username",
+        "smtp_password",
         mode="before",
     )
     @classmethod

@@ -43,6 +43,12 @@ services:
         sync: false
       - key: MATT_UPI_PAYEE_NAME
         sync: false
+      # Sending offers from your own address (Sales Desk). Render's free plan blocks SMTP, so use
+      # a free Brevo key with your Gmail verified as the sender there.
+      - key: MATT_MAIL_FROM
+        sync: false
+      - key: MATT_BREVO_API_KEY
+        sync: false
       # Change requests: a fine-grained GitHub token for this repository only (Contents and Pull
       # requests: read and write). MATT opens pull requests with it after you approve; never merges.
       - key: MATT_GITHUB_TOKEN

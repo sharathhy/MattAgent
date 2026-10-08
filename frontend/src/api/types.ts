@@ -557,8 +557,19 @@ export interface SalesService {
   sample: string;
 }
 
+export interface AutoSend {
+  enabled: boolean;
+  channel: string | null;
+  sender: string | null;
+  daily_cap: number;
+  sent_last_24h: number;
+  last_error: string | null;
+  missing: string[];
+}
+
 export interface SalesDesk {
   upi_ready: boolean;
   offers: SalesOffer[];
   without_contact: number;
+  auto_send?: AutoSend;
 }

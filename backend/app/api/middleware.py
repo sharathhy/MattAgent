@@ -56,7 +56,7 @@ async def request_context(
     path = request.url.path
     if not path.startswith(("/docs", "/redoc", "/openapi.json")):
         response.headers.update(SECURITY_HEADERS)
-        if path.startswith("/p/"):  # demo website previews: static HTML, no scripts at all
+        if path.startswith(("/p/", "/u/")):  # demo previews, unsubscribe: static, no scripts
             response.headers["Content-Security-Policy"] = DEMO_CSP
             response.headers["Referrer-Policy"] = "no-referrer"
         elif path.startswith("/api"):

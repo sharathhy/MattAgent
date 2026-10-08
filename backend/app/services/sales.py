@@ -2,8 +2,9 @@
 
 MATT finds local businesses with weak websites, audits them and writes a personal offer. The
 desk puts each offer next to the business's public contact with ready WhatsApp and email
-links and a UPI payment request in the owner's name. The owner sends it from their own phone
-or email (MATT sends nothing), marks it sent, and confirms the payment when it arrives, which
+links and a UPI payment request in the owner's name. When email sending is set up the sales
+agent emails offers by itself (app.services.outreach); otherwise the owner sends them from their
+own phone or email and marks them sent. The owner confirms each payment when it arrives, which
 records the revenue. Money only ever comes in.
 """
 
@@ -81,8 +82,10 @@ def sample_links(db: Session, lead: Lead, base_url: str) -> list[dict[str, str]]
     ]
 
 
-def message(db: Session, settings: Settings, lead: Lead, base_url: str = "") -> str:
-    text = (lead.outreach_draft or template_offer(lead)).strip()
+def message(
+    db: Session, settings: Settings, lead: Lead, base_url: str = "", text: str | None = None
+) -> str:
+    text = (text or lead.outreach_draft or template_offer(lead)).strip()
     extra: list[str] = []
     for link in sample_links(db, lead, base_url):
         what = "demo website" if link["service"] == "website" else f"sample ({link['name']})"
@@ -100,17 +103,26 @@ def message(db: Session, settings: Settings, lead: Lead, base_url: str = "") -> 
     return "\n".join([*lines[:stop], *extra, "", *lines[stop:]]).strip()
 
 
+def list_price(lead: Lead) -> Decimal:
+    """The estimate on the lead, else the catalog's starting price for its service."""
+    svc = next((x for x in demo_sites.CATALOG if x.name == lead.service), None)
+    return lead.estimated_value_min_inr or (Decimal(svc.price_inr) if svc else DEFAULT_PRICE)
+
+
+def split_subject(lead: Lead, text: str) -> tuple[str, str]:
+    """The 'Subject: ...' line of a draft (or a plain default) and the rest of the message."""
+    subject = next((ln[8:].strip() for ln in text.splitlines() if ln.startswith("Subject:")),
+                   f"A quick fix for {lead.business.name}'s website")  # fmt: skip
+    body = "\n".join(ln for ln in text.splitlines() if not ln.startswith("Subject:")).strip()
+    return subject, body
+
+
 def card(db: Session, settings: Settings, lead: Lead, base_url: str = "") -> dict[str, Any]:
     b = lead.business
-    text = message(db, settings, lead, base_url)
-    subject = next((ln[8:].strip() for ln in text.splitlines() if ln.startswith("Subject:")),
-                   f"A quick fix for {b.name}'s website")  # fmt: skip
-    body = "\n".join(ln for ln in text.splitlines() if not ln.startswith("Subject:")).strip()
+    subject, body = split_subject(lead, message(db, settings, lead, base_url))
     phone = _phone(b.public_phone)
     pay = _request(db, lead)
-    svc = next((x for x in demo_sites.CATALOG if x.name == lead.service), None)
-    amount = (pay.amount_inr if pay else lead.estimated_value_min_inr
-              or (Decimal(svc.price_inr) if svc else DEFAULT_PRICE))  # fmt: skip
+    amount = pay.amount_inr if pay else list_price(lead)
     return {
         "lead_id": lead.id, "business": b.name, "category": b.category, "city": b.city,
         "website": b.website, "website_score": b.website_score,
@@ -130,6 +142,8 @@ def card(db: Session, settings: Settings, lead: Lead, base_url: str = "") -> dic
 
 
 def desk(db: Session, settings: Settings, base_url: str = "") -> dict[str, Any]:
+    from app.services import outreach
+
     leads = db.scalars(
         select(Lead)
         .join(Business)
@@ -142,6 +156,7 @@ def desk(db: Session, settings: Settings, base_url: str = "") -> dict[str, Any]:
         "upi_ready": payments.upi_id(db, settings) is not None,
         "offers": [card(db, settings, lead, base_url) for lead in reachable],
         "without_contact": len(leads) - len(reachable),
+        "auto_send": outreach.status(db, settings),
     }
 
 

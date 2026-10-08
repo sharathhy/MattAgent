@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { api } from "../api/client";
-import type { SalesOffer, SalesService } from "../api/types";
+import type { AutoSend, SalesOffer, SalesService } from "../api/types";
 import { ActionError, Badge, Empty, PageHeader, useAction, useCan } from "../components/kit";
 import { ErrorState, Loading } from "../components/ui";
 
@@ -25,6 +25,7 @@ export function SalesDeskPage() {
       </ol>
       {desk.isPending && <Loading />}
       {desk.isError && <ErrorState error={desk.error} />}
+      {desk.data?.auto_send && <AutoSendStatus state={desk.data.auto_send} />}
       {desk.data && !desk.data.upi_ready && (
         <p className="text-sm text-amber-300">
           Add your UPI ID in <Link className="text-accent" to="/settings">Settings, Where you get paid</Link> so offers can include it.
@@ -38,6 +39,38 @@ export function SalesDeskPage() {
       )}
       {desk.data?.offers.map((o) => <Offer key={o.lead_id} offer={o} services={services.data ?? []} />)}
     </div>
+  );
+}
+
+/** Whether the sales agent emails offers by itself, and what is still needed if not. */
+function AutoSendStatus({ state }: { state: AutoSend }) {
+  if (!state.enabled) {
+    return (
+      <section className="panel space-y-2 p-4 text-sm">
+        <h2 className="font-semibold">Automatic email is off</h2>
+        <p className="text-muted">
+          The sales agent can email each offer and one follow-up by itself, at most {state.daily_cap || 10} a day, from
+          your address, with an unsubscribe link. To switch it on:
+        </p>
+        <ul className="list-disc space-y-1 pl-5 text-muted">
+          {state.missing.map((m) => (
+            <li key={m}>{m}</li>
+          ))}
+        </ul>
+      </section>
+    );
+  }
+  return (
+    <section className="panel space-y-1 p-4 text-sm">
+      <h2 className="font-semibold">
+        Automatic email is on <Badge value={`${state.sent_last_24h} of ${state.daily_cap} sent in 24h`} />
+      </h2>
+      <p className="text-muted">
+        The sales agent emails businesses that list a public email from {state.sender}, one at a time, with one follow-up
+        after 3 days. Replies arrive in your inbox. WhatsApp offers below still need you.
+      </p>
+      {state.last_error && <p className="text-amber-300">Last problem: {state.last_error}</p>}
+    </section>
   );
 }
 

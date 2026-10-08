@@ -346,6 +346,8 @@ describe("sales desk", () => {
         { slug: "social_media", name: "Social media posts for a month", price_inr: 2999, sample: "5 posts" }],
       "/sales": {
         upi_ready: true, without_contact: 0,
+        auto_send: { enabled: false, channel: null, sender: null, daily_cap: 10, sent_last_24h: 0, last_error: null,
+          missing: ["Connect an email to send from"] },
         offers: [{
           lead_id: 1, business: "Iron Gym", category: "gyms", city: "Mysuru", website: "https://iron.example",
           website_score: 38, opportunity_score: 81, findings: [], public_phone: "98450 12345", public_email: null,
@@ -364,5 +366,7 @@ describe("sales desk", () => {
     expect(screen.getByRole("link", { name: /WhatsApp 98450 12345/ })).toHaveAttribute("href", "https://wa.me/919845012345?text=Hello");
     expect(screen.getByRole("button", { name: "Paid ₹4999.00" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open free sample: Website design" })).toHaveAttribute("href", "https://matt.example/p/abc123abc123abc123");
+    expect(screen.getByText("Automatic email is off")).toBeInTheDocument();
+    expect(screen.getByText("Connect an email to send from")).toBeInTheDocument();
   });
 });
