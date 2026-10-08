@@ -14,6 +14,14 @@ function countdown(iso: string | null, now: number): string {
   return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}:${String(s % 60).padStart(2, "0")}`;
 }
 
+function ago(iso: string, now: number): string {
+  const s = Math.max(0, Math.round((now - new Date(iso).getTime()) / 1000));
+  return s < 60 ? `${s}s ago` : s < 3600 ? `${Math.floor(s / 60)}m ago` : `${Math.floor(s / 3600)}h ago`;
+}
+
+/** The scheduler heartbeats every minute or so; a long silence means the server is asleep or stuck. */
+const heartbeatOk = (iso: string | null, now: number) => iso !== null && now - new Date(iso).getTime() < 5 * 60_000;
+
 /** Autopilot under the brain: the big engage switch, what MATT is doing on its own, and when it acts next. */
 export function AutopilotHud() {
   const status = useQuery({ queryKey: ["autopilot"], queryFn: api.autopilot, refetchInterval: 5000 });
@@ -65,9 +73,10 @@ export function AutopilotHud() {
       </div>
 
       {s && on && (
-        <div className="mt-3 grid grid-cols-3 gap-2 border-t border-line pt-3 text-center">
+        <div className="mt-3 grid grid-cols-2 gap-2 border-t border-line pt-3 text-center sm:grid-cols-4">
           <Readout label="Next step in" value={countdown(s.next_cycle_at, now)} />
           <Readout label="Actions today" value={String(s.cycles_today)} />
+          <Readout label={`${s.bots_today} skill-bot turns`} value={`${s.bots_today}/${s.daily_bot_tasks}`} />
           <Readout label="Running now" value={String(s.active)} />
         </div>
       )}
@@ -81,6 +90,16 @@ export function AutopilotHud() {
             </li>
           ))}
         </ul>
+      )}
+
+      {s && (
+        <p className="mt-2 flex items-center gap-1.5 font-mono text-[11px] text-muted">
+          <span className={`h-1.5 w-1.5 rounded-full ${heartbeatOk(s.last_tick_at, now) ? "animate-pulse bg-ok" : "bg-warn"}`} aria-hidden />
+          Scheduler {s.last_tick_at ? `last checked in ${ago(s.last_tick_at, now)}` : "hasn't checked in yet"}
+          <span className={`ml-auto ${s.free_models_only ? "text-emerald-300" : "text-warn"}`}>
+            {s.free_models_only ? "AI: free-tier models only" : "AI: paid models allowed within budget"}
+          </span>
+        </p>
       )}
 
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted">
