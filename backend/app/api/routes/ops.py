@@ -20,7 +20,7 @@ from app.schemas.ops import (
     WorkflowInfo,
     WorkflowRunRequest,
 )
-from app.services import approvals, autopilot, command, dashboard, events, tasks
+from app.services import approvals, autopilot, command, dashboard, events, model_scout, tasks
 from app.workflows import WORKFLOWS
 
 router = APIRouter(tags=["operations"])
@@ -159,6 +159,9 @@ def get_settings_view(_: Admin, settings: AppSettings, model_router: Router) -> 
         "model_keys": {
             "MATT_GEMINI_API_KEY": bool(settings.gemini_api_key),
             "MATT_GROQ_API_KEY": bool(settings.groq_api_key),
+            "MATT_OPENROUTER_API_KEY": bool(settings.openrouter_api_key),
+            "MATT_CEREBRAS_API_KEY": bool(settings.cerebras_api_key),
+            "MATT_MISTRAL_API_KEY": bool(settings.mistral_api_key),
             "MATT_OLLAMA_URL": bool(settings.ollama_url),
             "MATT_ANTHROPIC_API_KEY": bool(settings.anthropic_api_key),
         },
@@ -189,3 +192,14 @@ def update_autopilot(
 def run_autopilot_now(db: DbSession, _: Admin, model_router: Router) -> TaskOut | None:
     task = autopilot.tick(db, model_router, force=True)
     return _task_out(task) if task else None
+
+
+@router.get("/models/free-sources")
+def free_model_sources(db: DbSession, _: CurrentUser, model_router: Router) -> list[dict[str, Any]]:
+    """What the Free Model Scout found: free-tier services, their health and chosen models."""
+    return model_scout.status(db, model_router)
+
+
+@router.post("/models/scout")
+def run_model_scout(db: DbSession, _: Admin, model_router: Router) -> list[dict[str, Any]]:
+    return model_scout.scan(db, model_router)

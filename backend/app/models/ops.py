@@ -137,3 +137,17 @@ class Autopilot(TimestampMixin, Base):
     #: Skill bots: how many independent skill turns a day (kept well inside free AI limits).
     daily_bot_tasks: Mapped[int] = mapped_column(Integer, default=48, server_default="48")
     bot_cursor: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+
+
+class ModelSource(TimestampMixin, Base):
+    """What the Free Model Scout last found for one free-tier AI service."""
+
+    __tablename__ = "model_sources"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    slug: Mapped[str] = mapped_column(String(50), unique=True, index=True)
+    status: Mapped[str] = mapped_column(String(20))  # ok, not_connected, error, no_free_model
+    model: Mapped[str | None] = mapped_column(String(200))
+    free_models: Mapped[int] = mapped_column(Integer, default=0)
+    error: Mapped[str | None] = mapped_column(Text)
+    checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

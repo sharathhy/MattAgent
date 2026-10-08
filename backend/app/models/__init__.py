@@ -10,11 +10,20 @@ from app.models.business import (
     Opportunity,
     Product,
 )
-from app.models.ops import Approval, Autopilot, Event, ModelUsage, Task, Tool, WorkflowRun
+from app.models.ops import (
+    Approval,
+    Autopilot,
+    Event,
+    ModelSource,
+    ModelUsage,
+    Task,
+    Tool,
+    WorkflowRun,
+)
 from app.models.user import User
 
 __all__ = [
     "Agent", "AgentVersion", "Approval", "AuditLog", "Autopilot", "Business", "Customer", "Event",
-    "Experiment", "Knowledge", "Lead", "LedgerEntry", "ModelUsage", "Opportunity",
+    "Experiment", "Knowledge", "Lead", "LedgerEntry", "ModelSource", "ModelUsage", "Opportunity",
     "Product", "Task", "Tool", "User", "WorkflowRun",
 ]  # fmt: skip

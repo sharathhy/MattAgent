@@ -241,4 +241,30 @@ describe("working pages", () => {
     expect(screen.getByText("No AI model is configured")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
   });
+
+  it("shows what the Free Model Scout found and where to get missing keys", async () => {
+    tokenStore.set("tok");
+    mockApi({
+      "/auth/me": OWNER,
+      "/autopilot": AUTOPILOT,
+      "/settings": {
+        environment: "production", owner_email: "owner@example.com", google_sign_in: true, models: [],
+        model_keys: { MATT_GEMINI_API_KEY: true }, free_models_only: true, allow_premium_models: false,
+        daily_ai_budget_inr: 0, monthly_ai_budget_inr: 0, worker_enabled: true, email_sending: false,
+      },
+      "/models/free-sources": [
+        { slug: "gemini", name: "Google Gemini (AI Studio)", env_var: "MATT_GEMINI_API_KEY", signup_url: "https://aistudio.google.com/apikey",
+          free_limits: "Free tier", note: "", recommended: true, connected: true, model: "gemini-3.8-flash", status: "ok",
+          free_models: 4, error: null, checked_at: "2026-10-08T10:00:00Z", calls_24h: 12, failures_24h: 1 },
+        { slug: "groq", name: "Groq", env_var: "MATT_GROQ_API_KEY", signup_url: "https://console.groq.com/keys",
+          free_limits: "1,000 a day", note: "", recommended: true, connected: false, model: null, status: "not_connected",
+          free_models: 0, error: null, checked_at: null, calls_24h: 0, failures_24h: 0 },
+      ],
+    });
+    renderApp("/settings");
+    expect(await screen.findByText("gemini-3.8-flash")).toBeInTheDocument();
+    expect(screen.getByText("(1 failed)")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Get a free key" })).toHaveAttribute("href", "https://console.groq.com/keys");
+    expect(screen.getByRole("button", { name: "Scan now" })).toBeInTheDocument();
+  });
 });

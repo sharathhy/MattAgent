@@ -93,42 +93,133 @@ class OpenAICompatibleProvider:
         )
 
 
-class GeminiProvider(OpenAICompatibleProvider):
-    """Gemini through its OpenAI-compatible endpoint, free tier.
+class DiscoveringProvider(OpenAICompatibleProvider):
+    """An OpenAI-compatible free-tier service whose model list MATT reads for itself.
 
-    Google retires model names over time. If the configured name returns 404, the provider asks
-    the API which models this key can use, switches to the newest general "flash" model, and
-    retries once, so a retired name never stops MATT.
+    Providers retire model names over time. If the configured name is missing or the service
+    answers 404, the provider asks the API which models this key can use, picks the best free
+    one and retries once, so a retired name never stops MATT. The Free Model Scout calls
+    ``discover_model`` on a schedule as well.
     """
 
-    PREFERRED = ("gemini-flash-latest", "gemini-flash-lite-latest")
-    SKIP = ("image", "tts", "audio", "live", "embedding", "exp", "thinking", "vision", "pro")
+    def pick(self, models: list[dict[str, Any]]) -> str | None:
+        raise NotImplementedError
+
+    def is_free(self, model: str) -> bool:
+        return True
+
+    def free_models(self, models: list[dict[str, Any]]) -> list[str]:
+        """The models this key can call for free (all of them on a free-tier-only key)."""
+        return [str(m.get("id", "")) for m in models if self.is_free(str(m.get("id", "")))]
+
+    def list_models(self) -> list[dict[str, Any]]:
+        headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
+        try:
+            r = httpx.get(f"{self.base_url}/models", headers=headers, timeout=30)
+            r.raise_for_status()
+            data = r.json().get("data", [])
+        except (httpx.HTTPError, ValueError, AttributeError) as exc:
+            raise ProviderError(f"{self.spec.provider}: could not list models ({exc})") from exc
+        return [m for m in data if isinstance(m, dict)]
+
+    def discover_model(self) -> str | None:
+        try:
+            return self.pick(self.list_models())
+        except ProviderError:
+            return None
+
+    def use_model(self, model: str) -> None:
+        self.spec = replace(self.spec, model=model)
+
+    def _replacement(self, error: str) -> str | None:
+        return self.discover_model()
 
     def complete(self, system: str, prompt: str, max_tokens: int) -> Completion:
+        if not self.spec.model:
+            found = self.discover_model()
+            if found is None:
+                raise ProviderError(f"{self.spec.provider}: no free model available")
+            self.use_model(found)
+        if not self.is_free(self.spec.model):
+            raise ProviderError(f"{self.spec.provider}: refusing {self.spec.model} (not free)")
         try:
             return super().complete(system, prompt, max_tokens)
         except ProviderError as exc:
             if "HTTP 404" not in str(exc):
                 raise
-            # Google's 404 usually names the replacement ("Please ... use models/<name>").
-            current = suggested_model(str(exc), self.spec.model) or self.discover_model()
-            if current is None or current == self.spec.model:
+            current = self._replacement(str(exc))
+            if current is None or current == self.spec.model or not self.is_free(current):
                 raise
-            self.spec = replace(self.spec, model=current)
+            self.use_model(current)
             return super().complete(system, prompt, max_tokens)
 
-    def discover_model(self) -> str | None:
-        try:
-            r = httpx.get(
-                f"{self.base_url}/models",
-                headers={"Authorization": f"Bearer {self.api_key}"},
-                timeout=30,
-            )
-            r.raise_for_status()
-            ids = [str(m.get("id", "")).removeprefix("models/") for m in r.json().get("data", [])]
-        except (httpx.HTTPError, ValueError, AttributeError):
-            return None
+
+class GeminiProvider(DiscoveringProvider):
+    """Gemini through its OpenAI-compatible endpoint, free tier."""
+
+    PREFERRED = ("gemini-flash-latest", "gemini-flash-lite-latest")
+    SKIP = ("image", "tts", "audio", "live", "embedding", "exp", "thinking", "vision", "pro")
+
+    def _replacement(self, error: str) -> str | None:
+        # Google's 404 usually names the replacement ("Please ... use models/<name>").
+        return suggested_model(error, self.spec.model) or self.discover_model()
+
+    def pick(self, models: list[dict[str, Any]]) -> str | None:
+        ids = [str(m.get("id", "")).removeprefix("models/") for m in models]
         return pick_gemini_model(ids, self.PREFERRED, self.SKIP)
+
+
+class ChatModelProvider(DiscoveringProvider):
+    """Groq, Cerebras, Mistral and similar free tiers: pick the strongest general chat model."""
+
+    SKIP = ("whisper", "guard", "tts", "embed", "audio", "image", "vision", "moderation",
+            "ocr", "transcribe", "speech", "rerank", "prompt-guard", "safeguard")  # fmt: skip
+
+    def __init__(self, spec: ModelSpec, base_url: str, api_key: str | None,
+                 preferred: tuple[str, ...] = (), timeout: float = 90) -> None:  # fmt: skip
+        super().__init__(spec, base_url, api_key, timeout)
+        self.preferred = preferred
+
+    def pick(self, models: list[dict[str, Any]]) -> str | None:
+        ids = [str(m.get("id", "")) for m in models]
+        for name in (self.spec.model, *self.preferred):
+            if name and name in ids:
+                return name
+        chat = [i for i in ids if i and not any(word in i.lower() for word in self.SKIP)]
+        return max(chat, key=_size, default=None)
+
+
+class OpenRouterProvider(DiscoveringProvider):
+    """OpenRouter's free models only: ids ending in ":free" with zero prompt and output price.
+    Any other model is refused before a request is sent, so this key can never be charged."""
+
+    def is_free(self, model: str) -> bool:
+        return model.endswith(":free")
+
+    def free_models(self, models: list[dict[str, Any]]) -> list[str]:
+        return [str(m["id"]) for m in models if _free_text_model(m)]
+
+    def pick(self, models: list[dict[str, Any]]) -> str | None:
+        free = [m for m in models if _free_text_model(m)]
+        ids = [str(m["id"]) for m in free]
+        if self.spec.model in ids:
+            return self.spec.model
+        best = max(free, key=lambda m: (_size(str(m["id"])), int(m.get("context_length") or 0)),
+                   default=None)  # fmt: skip
+        return str(best["id"]) if best else None
+
+
+def _free_text_model(m: dict[str, Any]) -> bool:
+    pricing = m.get("pricing") or {}
+    zero = all(str(pricing.get(k, "1")) in ("0", "0.0") for k in ("prompt", "completion"))
+    outputs = str((m.get("architecture") or {}).get("output_modalities", ["text"]))
+    return str(m.get("id", "")).endswith(":free") and zero and "text" in outputs
+
+
+def _size(model_id: str) -> float:
+    """Parameter count in billions from names like llama-3.3-70b or qwen3-235b-a22b."""
+    sizes = [float(n) for n in re.findall(r"(\d+(?:\.\d+)?)b(?![a-z])", model_id.lower())]
+    return max(sizes, default=0.0)
 
 
 def suggested_model(error: str, current: str) -> str | None:

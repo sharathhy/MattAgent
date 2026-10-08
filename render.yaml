@@ -5,7 +5,8 @@
 # AI reasoning: set MATT_GEMINI_API_KEY (free tier, https://aistudio.google.com/apikey). Keep billing
 # OFF on that Google project so the key stays on the free tier: over the limit Google answers
 # "429 rate limited", it never charges. MATT_FREE_MODELS_ONLY=true blocks every paid or premium
-# model in code, whatever keys are set. Groq (also free tier) is optional. Leave unused keys blank.
+# model in code, whatever keys are set. Groq, OpenRouter (':free' models only) and Cerebras are
+# optional extra free tiers the Free Model Scout spreads work across. Leave unused keys blank.
 services:
   - type: web
     name: matt
@@ -31,6 +32,10 @@ services:
       - key: MATT_GEMINI_API_KEY
         sync: false
       - key: MATT_GROQ_API_KEY
+        sync: false
+      - key: MATT_OPENROUTER_API_KEY
+        sync: false
+      - key: MATT_CEREBRAS_API_KEY
         sync: false
       - key: MATT_FREE_MODELS_ONLY
         value: "true"

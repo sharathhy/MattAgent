@@ -42,6 +42,14 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-3.8-flash"
     groq_api_key: str | None = None
     groq_model: str = "llama-3.3-70b-versatile"
+    #: More free tiers the Free Model Scout can use (see app/llm/free_sources.py). Empty model
+    #: names let MATT pick the best free model itself.
+    openrouter_api_key: str | None = None
+    openrouter_model: str = ""
+    cerebras_api_key: str | None = None
+    cerebras_model: str = ""
+    mistral_api_key: str | None = None
+    mistral_model: str = "mistral-small-latest"
     ollama_url: str | None = None
     ollama_model: str = "llama3.2"
     anthropic_api_key: str | None = None
@@ -71,6 +79,9 @@ class Settings(BaseSettings):
         "static_dir",
         "gemini_api_key",
         "groq_api_key",
+        "openrouter_api_key",
+        "cerebras_api_key",
+        "mistral_api_key",
         "ollama_url",
         "anthropic_api_key",
         mode="before",

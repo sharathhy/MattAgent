@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { api } from "../api/client";
 import { AutopilotPanel } from "../components/AutopilotPanel";
+import { FreeModelScout } from "../components/FreeModelScout";
 import { Badge, PageHeader, Table, inr, useCan } from "../components/kit";
 import { ErrorState, Loading, Panel } from "../components/ui";
 
@@ -43,6 +44,7 @@ export function SettingsPage() {
           </p>
         </Panel>
       </div>
+      <FreeModelScout />
       <Panel title="Model keys">
         <ul className="grid gap-2 text-sm sm:grid-cols-2">
           {Object.entries(s.model_keys).map(([k, set]) => (

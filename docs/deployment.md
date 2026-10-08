@@ -47,6 +47,18 @@ models the key can use and picks the newest Flash model, by itself.
 Autopilot keeps within the free limits: one main action every 15 minutes plus at most 48
 skill-bot turns a day, one at a time.
 
+### Free Model Scout
+
+Every 6 hours (and when the service starts) the Cost Optimization skill checks each free-tier
+AI service MATT knows about: Google Gemini, Groq, OpenRouter (only models ending in `:free`;
+any other model is refused before a request is sent), Cerebras and Mistral. For each connected
+service it reads the model list, switches to the best free model, and records health and the
+last 24 hours of calls in Settings, Free Model Scout. When one free tier hits its limit, the
+router moves on to the next. MATT cannot sign up or create keys itself, so it asks you once, in
+Approvals, to add the most useful missing key (`MATT_GROQ_API_KEY`, `MATT_OPENROUTER_API_KEY`,
+`MATT_CEREBRAS_API_KEY`) in Render. Mistral's free plan trains on your prompts, so MATT never
+asks for it. Create every key on a free plan with no card, and keep billing off.
+
 Optional: `MATT_GROQ_API_KEY` (free tier) and `MATT_OLLAMA_URL` (your own server). Setting
 `MATT_FREE_MODELS_ONLY=false` would allow paid models (for example Claude with
 `MATT_ANTHROPIC_API_KEY` and `MATT_ALLOW_PREMIUM_MODELS=true`), and even then only within

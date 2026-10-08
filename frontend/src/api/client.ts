@@ -9,6 +9,7 @@ import type {
   Business,
   CommandResponse,
   Dashboard,
+  FreeModelSource,
   Health,
   HierarchyNode,
   Lead,
@@ -119,6 +120,8 @@ export const api = {
   updateAutopilot: (body: Partial<Pick<AutopilotStatus, "enabled" | "cities" | "categories" | "interval_minutes" | "daily_outreach_drafts">>) =>
     send<AutopilotStatus>("PUT", "/autopilot", body),
   runAutopilot: () => post<Task | null>("/autopilot/run", {}),
+  freeSources: () => request<FreeModelSource[]>("/models/free-sources"),
+  runScout: () => post<FreeModelSource[]>("/models/scout", {}),
 
   tasks: (filters: { status?: string; agent?: string } = {}) => request<Task[]>(`/tasks${query(filters)}`),
   task: (id: number) => request<Task>(`/tasks/${id}`),

@@ -15,12 +15,15 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
+from app.llm.free_sources import FREE_SOURCES
 from app.llm.providers import (
     AnthropicProvider,
+    ChatModelProvider,
     Completion,
     GeminiProvider,
     ModelSpec,
     OpenAICompatibleProvider,
+    OpenRouterProvider,
     Provider,
     ProviderError,
 )
@@ -57,36 +60,19 @@ def build_providers(settings: Settings) -> list[Provider]:
                 None,
             )
         )
-    if settings.gemini_api_key:
-        providers.append(
-            GeminiProvider(
-                ModelSpec(
-                    "gemini",
-                    settings.gemini_model,
-                    "free",
-                    3,
-                    rate_limit="free tier, per-minute and per-day request caps",
-                    use_cases=("research", "writing", "planning"),
-                ),
-                "https://generativelanguage.googleapis.com/v1beta/openai",
-                settings.gemini_api_key,
-            )
-        )
-    if settings.groq_api_key:
-        providers.append(
-            OpenAICompatibleProvider(
-                ModelSpec(
-                    "groq",
-                    settings.groq_model,
-                    "free",
-                    3,
-                    rate_limit="free tier, per-minute token caps",
-                    use_cases=("classification", "writing"),
-                ),
-                "https://api.groq.com/openai/v1",
-                settings.groq_api_key,
-            )
-        )
+    for source in FREE_SOURCES:
+        key = getattr(settings, f"{source.slug}_api_key")
+        if not key:
+            continue
+        model = getattr(settings, f"{source.slug}_model")
+        spec = ModelSpec(source.slug, model, "free", 3, rate_limit=source.free_limits,
+                         use_cases=("research", "writing"))  # fmt: skip
+        if source.slug == "gemini":
+            providers.append(GeminiProvider(spec, source.base_url, key))
+        elif source.slug == "openrouter":
+            providers.append(OpenRouterProvider(spec, source.base_url, key))
+        else:
+            providers.append(ChatModelProvider(spec, source.base_url, key, source.preferred))
     if settings.anthropic_api_key and not settings.free_models_only:
         providers.append(
             AnthropicProvider(
@@ -116,6 +102,9 @@ class ModelRouter:
     @property
     def available(self) -> bool:
         return any(self._eligible(p, 1) for p in self.providers)
+
+    def provider(self, slug: str) -> Provider | None:
+        return next((p for p in self.providers if p.spec.provider == slug), None)
 
     def catalog(self) -> list[ModelSpec]:
         return [p.spec for p in self.providers]

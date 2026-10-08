@@ -399,3 +399,21 @@ export interface AutopilotStatus {
   recent: { task_id: number; action: string; status: TaskStatus; result: string | null; created_at: string }[];
   latest_report: { title: string; content: string; created_at: string } | null;
 }
+
+export interface FreeModelSource {
+  slug: string;
+  name: string;
+  env_var: string;
+  signup_url: string;
+  free_limits: string;
+  note: string;
+  recommended: boolean;
+  connected: boolean;
+  model: string | null;
+  status: "ok" | "not_connected" | "error" | "no_free_model" | "not_checked";
+  free_models: number;
+  error: string | null;
+  checked_at: string | null;
+  calls_24h: number;
+  failures_24h: number;
+}
