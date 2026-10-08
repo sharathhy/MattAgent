@@ -47,8 +47,8 @@ function findPage(text: string) {
 
 export const CAPABILITIES =
   "Ask me to find businesses in a city that need a better website, audit any website, research new " +
-  "opportunities, brief you on status, or tell you what we've earned today. Anything else goes to your CEO " +
-  "agent and its team. I can also set timers and reminders, do quick maths, search the web, play YouTube, " +
+  "opportunities, brief you on status, or tell you what we've earned today. Ask me anything else in your own " +
+  "words and I'll answer or hand the work to the team. I can also set timers and reminders, do quick maths, search the web, play YouTube, " +
   "open any page, look up any agent, and sign you out.";
 
 // Mirrors backend app/core/money.py. Money only ever comes in, so anything that sounds like moving money out
@@ -72,7 +72,8 @@ export async function runCommand(raw: string, ctx: CommandContext): Promise<Comm
 
   if (has(t, "sign out", "log out", "logout")) return { say: `Signing you out, ${ctx.userName}.`, logout: true };
 
-  if (has(t, "help", "what can you do", "capabilities")) return { say: CAPABILITIES };
+  // Only a bare "help": "help me write an email" is a real request for the brain.
+  if (/^(help|what can you do|capabilities|what are your capabilities)$/.test(t)) return { say: CAPABILITIES };
 
   if (/\b(who are you|your name|introduce yourself)\b/.test(t))
     return { say: "I'm MATT, the operating brain of your autonomous company. " + CAPABILITIES };
@@ -105,8 +106,10 @@ export async function runCommand(raw: string, ctx: CommandContext): Promise<Comm
   if (agentQuery?.[1] && !findPage(agentQuery[1])) {
     const q = agentQuery[1];
     const hits = await api.agents({ q });
-    const first = hits[0];
-    // No such agent: it was probably a real request ("what is our best opportunity"), so ask the CEO.
+    // Only a clear agent lookup is answered here; "what is the capital of France" goes to MATT's brain.
+    const named = /\b(agent|skill)\b/i.test(text);
+    const key = q.toLowerCase();
+    const first = named ? hits[0] : hits.find((h) => h.name.toLowerCase() === key || h.slug === key.replace(/\s+/g, "-"));
     if (!first) return askAgents(text);
     const detail = await api.agent(first.slug);
     const more = hits.length > 1 ? ` I found ${hits.length - 1} other match${hits.length > 2 ? "es" : ""} too.` : "";
@@ -153,11 +156,11 @@ const INTENT_PAGE: Record<string, string> = {
   opportunity_research: "/opportunities",
 };
 
-/** Anything MATT can't answer locally goes to the backend command API: workflows or the CEO agent. */
+/** Anything MATT can't answer locally goes to the backend command API: workflows or MATT's brain. */
 async function askAgents(text: string): Promise<CommandOutcome> {
   const res = await api.command(text);
-  // The CEO answers inline; workflows keep running, so MATT reports back when they finish.
-  const background = res.task_id !== null && res.intent !== "ceo";
+  // The brain answers inline; workflows keep running, so MATT reports back when they finish.
+  const background = res.task_id !== null && res.intent !== "ceo" && res.intent !== "chat";
   const page = typeof res.data.navigate === "string" ? res.data.navigate : INTENT_PAGE[res.intent];
   return { say: res.reply, navigate: page, taskId: background ? (res.task_id ?? undefined) : undefined };
 }

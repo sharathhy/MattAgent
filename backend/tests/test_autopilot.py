@@ -263,3 +263,34 @@ def test_old_30_minute_rows_move_to_15(db: Session) -> None:
     db.add(Autopilot(enabled=True, cities=["Mysuru"], categories=["gyms"], interval_minutes=30))
     db.commit()
     assert autopilot.get(db).interval_minutes == 15
+
+
+def test_bots_work_in_parallel_one_per_free_provider_with_memory(
+    seeded: None, owner_headers: dict[str, str], settings: Settings, db: Session
+) -> None:
+    from dataclasses import replace
+
+    from app.models import Experiment
+    from app.workflows import Context, run_workflow
+
+    a, b = free([IDEA]), free([IDEA])
+    b.spec = replace(b.spec, provider="other-free")
+    router = ModelRouter(settings, providers=[a, b])
+    queued = autopilot.queue_bots(db, router, autopilot.get(db))
+    lanes = [t.input["params"]["provider"] for t in queued]
+    agents = {t.input["params"]["agent_slug"] for t in queued}
+    assert sorted(lanes) == ["fake", "other-free"] and len(agents) == 2
+    assert autopilot.queue_bots(db, router, autopilot.get(db)) == []  # spread over the day
+    status = autopilot.status(db, router)
+    assert len(status["bots_working"]) == 2 and status["bot_lanes"] == ["fake", "other-free"]
+
+    # Each bot starts on its own provider, and sees its own past work next time.
+    params = queued[1].input["params"]
+    run_workflow(Context(db=db, router=router), "skill_bot", params)
+    assert len(b.calls if params["provider"] == "other-free" else a.calls) == 1
+    db.add(Experiment(name="Old idea", hypothesis="h", agent_slug=params["agent_slug"],
+                      status="completed", result="nobody bought"))  # fmt: skip
+    db.commit()
+    run_workflow(Context(db=db, router=router), "skill_bot", params)
+    last_prompt = (a.calls + b.calls)[-1][1]
+    assert "Old idea" in last_prompt and "nobody bought" in last_prompt

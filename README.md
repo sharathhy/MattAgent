@@ -33,7 +33,11 @@ What works today:
   Approvals. It never sends, spends or publishes by itself.
 - **Alexa-style commands** that need no AI key: "how much did we earn today", "record 15k
   received for a website project", "which skills are earning", "what's pending", "top leads",
-  "remember that...", "open revenue", "what time is it". Anything else goes to the CEO agent.
+  "remember that...", "open revenue", "what time is it". Anything else goes to MATT's brain, a
+  conversational agent that answers any question, remembers the conversation and can hand
+  work to the team (find leads, audit, research, assign a skill, run a bot). Skill bots work in
+  parallel, one per connected free AI provider, each remembering its past experiments, and
+  hand you ready-to-use earning steps. MATT never signs in to your accounts.
 - **Receive-only money (main rule):** customers pay the owner's own UPI ID directly through a
   payment request (QR code and `upi://pay` link). MATT never sends, transfers, withdraws or
   debits money, enforced in code; a payment counts as revenue once the owner confirms it. The

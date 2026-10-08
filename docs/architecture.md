@@ -58,7 +58,11 @@ React 19 + TypeScript (strict) + Tailwind 4 + TanStack Query + React Router. Eve
 ## Orchestration
 
 `POST /api/command` maps clear requests ("find gyms in Mysore", "audit example.com", "status")
-to deterministic workflows and sends everything else to the CEO agent, which may delegate with
-`DELEGATE <slug>: <objective>` lines to its direct reports. Tasks are rows in `tasks`, claimed by
+to deterministic workflows and sends everything else to MATT's brain (`app/services/chat.py`):
+a conversational agent with a live briefing, the last few turns of the conversation (memory
+kind `chat`, kept 30 days) and tools it calls with `DO <tool>: <argument>` lines (find, audit,
+research, assign, bot, remember, change_code, autopilot). Agent tasks can still delegate with
+`DELEGATE <slug>: <objective>` lines to direct reports. Skill bots run in batches, one per free
+provider (`ModelRouter.lanes()`, `prefer=`), on `MATT_WORKER_THREADS` parallel workers. Tasks are rows in `tasks`, claimed by
 the worker (`SELECT ... FOR UPDATE SKIP LOCKED` on PostgreSQL), executed through the model
 router, and recorded with model, tokens and INR cost. Every step writes to `events`.

@@ -140,25 +140,42 @@ def test_rerunning_discovery_does_not_duplicate(
     assert len(db.scalars(select(Lead)).all()) == 2
 
 
-def test_ceo_answers_and_delegates(
+def test_matt_answers_anything_and_acts_through_tools(
     client: TestClient, owner_headers: dict[str, str], seeded: None, fake: FakeProvider, db: Session
 ) -> None:
     fake.replies = [
-        "Here is the plan. ASSUMPTION: demand exists.\nDELEGATE cro: build a lead list\n"
-        "DELEGATE not-a-real-agent: ignore me\nDELEGATE cmo: draft positioning"
+        "Start with five clinics you can visit this week. ASSUMPTION: demand exists.\n"
+        "DO assign cro: build a lead list of 20 clinics\nDO assign not-a-real-agent: ignore me\n"
+        "DO find: dentists in Mysuru",
+        "Paris is the capital of France.",
     ]
     r = client.post(
         "/api/command", json={"text": "How do we get first customers?"}, headers=owner_headers
     )
     body = r.json()
-    assert body["intent"] == "ceo"
-    assert "DELEGATE" not in body["reply"] and "2 follow-up" in body["reply"]
-    system, _prompt = fake.calls[0]
-    assert "untrusted_data" in system and "cro:" in system
-    subs = db.scalars(select(Task).where(Task.parent_id == body["task_id"])).all()
-    assert sorted(t.agent.slug for t in subs if t.agent) == ["cmo", "cro"]
-    ceo = client.get("/api/agents/ceo", headers=owner_headers).json()
-    assert ceo["tasks_completed"] == 1
+    assert body["intent"] == "chat"
+    assert "DO " not in body["reply"] and "Assigned to" in body["reply"]
+    assert "no team member called not-a-real-agent" in body["reply"]
+    system, prompt = fake.calls[0]
+    assert "untrusted_data" in prompt and "cro:" in prompt and "Gmail" in system
+    work = db.scalars(select(Task)).all()
+    assert any(t.agent and t.agent.slug == "cro" for t in work)
+    assert any((t.input or {}).get("workflow") == "website_opportunities" for t in work)
+
+    # A plain question gets a real answer, and MATT remembers the conversation.
+    r = client.post("/api/command", json={"text": "help me with geography: what is the capital "
+                    "of France"}, headers=owner_headers).json()  # fmt: skip
+    assert r["intent"] == "chat" and "Paris" in r["reply"]
+    assert "How do we get first customers?" in fake.calls[1][1]
+
+
+def test_matt_says_plainly_when_the_free_models_fail(
+    client: TestClient, owner_headers: dict[str, str], seeded: None, settings: Settings
+) -> None:
+    client.app.state.model_router = ModelRouter(settings, providers=[free(fail=True)])  # type: ignore[attr-defined]
+    r = client.post("/api/command", json={"text": "write me a short poem"}, headers=owner_headers)
+    body = r.json()
+    assert body["intent"] == "model_error" and "Free Model Scout" in body["reply"]
 
 
 def test_untrusted_context_is_wrapped(

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { api } from "../../api/client";
+import { Bots } from "../AutopilotPanel";
 import { ActionError, Badge, useAction, useCan } from "../kit";
 
 function countdown(iso: string | null, now: number): string {
@@ -76,10 +77,12 @@ export function AutopilotHud() {
         <div className="mt-3 grid grid-cols-2 gap-2 border-t border-line pt-3 text-center sm:grid-cols-4">
           <Readout label="Next step in" value={countdown(s.next_cycle_at, now)} />
           <Readout label="Actions today" value={String(s.cycles_today)} />
-          <Readout label={`${s.bots_today} skill-bot turns`} value={`${s.bots_today}/${s.daily_bot_tasks}`} />
+          <Readout label={`${s.bots_today} skill-bot turns`} value={`${s.bots_today}/${s.daily_bot_tasks * Math.max(1, s.bot_lanes.length)}`} />
           <Readout label="Running now" value={String(s.active)} />
         </div>
       )}
+
+      {s && on && <Bots status={s} full={false} />}
 
       {s && on && s.recent.length > 0 && (
         <ul className="mt-3 space-y-1.5 text-sm">

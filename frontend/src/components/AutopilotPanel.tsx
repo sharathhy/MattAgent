@@ -48,8 +48,9 @@ export function AutopilotPanel({ full = false }: { full?: boolean }) {
       <p className="mt-2 text-xs text-muted">
         When on, the CEO picks the most valuable next step on a schedule: the daily report, finding and auditing leads,
         researching opportunities{s && !s.ai_model_available ? " (needs an AI key)" : ""}, and drafting pitches that wait
-        in Approvals. Each cycle one skill also works on its own as an AI bot (up to {s?.daily_bot_tasks ?? 48} a day) and
-        saves its work to Memory. It never sends, spends or publishes on its own.
+        in Approvals. Alongside, the skills work as AI bots on their own money ideas, one per free AI provider at the
+        same time (up to {s?.daily_bot_tasks ?? 144} turns a day per provider), each remembering what it tried before.
+        They hand you ready-to-use steps; MATT never signs in to your accounts, sends, spends or publishes on its own.
       </p>
       {s && (
         <p className="mt-1 text-xs text-muted">
@@ -58,6 +59,7 @@ export function AutopilotPanel({ full = false }: { full?: boolean }) {
         </p>
       )}
       <ActionError error={toggle.error ?? runNow.error} />
+      {s && s.enabled && <Bots status={s} full={full} />}
       {full && s && <Targets status={s} canEdit={isOwner} />}
       {s && s.recent.length > 0 && (
         <ul className="mt-3 space-y-1.5 text-sm">
@@ -135,6 +137,44 @@ function Targets({ status, canEdit }: { status: AutopilotStatus; canEdit: boolea
       )}
       {save.isSuccess && <p className="text-xs text-ok">Saved.</p>}
       <ActionError error={save.error} />
+    </div>
+  );
+}
+
+/** The skill bots working right now, which free provider each one is on, and their latest output. */
+export function Bots({ status, full }: { status: AutopilotStatus; full: boolean }) {
+  return (
+    <div className="mt-3 space-y-2 text-sm">
+      <div className="label">
+        Bots at work · {status.bot_lanes.length ? status.bot_lanes.join(", ") : "no free AI provider reachable"}
+      </div>
+      {status.bots_working.length === 0 ? (
+        <p className="text-xs text-muted">Between batches. The next bots start shortly.</p>
+      ) : (
+        <ul className="flex flex-wrap gap-2">
+          {status.bots_working.map((b) => (
+            <li key={b.task_id} className="flex items-center gap-2 rounded-full border border-line px-3 py-1 text-xs">
+              <span className={`h-2 w-2 rounded-full ${b.status === "running" ? "animate-pulse bg-ok" : "bg-slate-500"}`} aria-hidden />
+              {b.agent}
+              {b.provider && <span className="text-muted">on {b.provider}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+      {status.bot_feed.length > 0 && (
+        <ul className="space-y-1">
+          {status.bot_feed.slice(0, full ? 8 : 3).map((f, i) => (
+            <li key={i}>
+              <details>
+                <summary className="cursor-pointer truncate text-xs text-slate-300">
+                  {f.title} <span className="text-muted">· {formatDate(f.created_at)}</span>
+                </summary>
+                <pre className="mt-1 whitespace-pre-wrap rounded-lg bg-slate-950/60 p-2 font-sans text-xs">{f.text}</pre>
+              </details>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

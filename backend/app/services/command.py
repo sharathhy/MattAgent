@@ -1,7 +1,8 @@
 """The command line into MATT (typed or spoken).
 
 Clear requests map to deterministic workflows that run without an AI model. Everything else
-goes to the CEO agent, which answers and may delegate to its executives.
+goes to MATT's conversational brain (app/services/chat.py), which answers any question and can
+queue work for the team.
 """
 
 import re
@@ -37,7 +38,6 @@ FIND = re.compile(
 AUDIT = re.compile(
     r"\b(audit|analy[sz]e|check|score)\b.*?((?:https?://)?[a-z0-9-]+(?:\.[a-z0-9-]+)+\S*)", re.I
 )
-OPPORTUNITY = re.compile(r"\b(opportunit(?:y|ies)|business ideas?)\b", re.I)
 STATUS = re.compile(r"\b(status|what'?s (?:happening|going on)|update me|brief me|report)\b", re.I)
 WAKE_PREFIX = re.compile(r"^\W*(?:(?:hey|hi|hello|ok|okay)\W+)?matt\b\W*", re.I)
 WAKE_REPLY = "I'm listening. What needs to be done?"
@@ -114,40 +114,15 @@ def handle(db: Session, router: ModelRouter, user: User, text: str) -> CommandRe
 
     if not router.available:
         return CommandResult(
-            "I can't reason about that yet because no AI model is connected. Add a free Gemini "
-            "key as MATT_GEMINI_API_KEY in Render. Without it I can still find businesses "
-            '("find gyms in Bangalore"), audit a website, and give you a status report.',
+            "My AI brain is switched off because no free AI model is connected, so I can only do "
+            "the built-in commands. Add a free Gemini key as MATT_GEMINI_API_KEY in Render "
+            "(Settings, Free Model Scout lists more free options). Until then I can find "
+            'businesses ("find gyms in Bangalore"), audit a website and give you a status report.',
             "no_model",
         )
 
-    if OPPORTUNITY.search(text):
-        task = tasks.create(
-            db, kind="workflow", created_by=actor, objective=text,
-            input={"workflow": "opportunity_research", "params": {"focus": text}},
-        )  # fmt: skip
-        return CommandResult(
-            "Researching opportunities and scoring them now. They'll appear in Opportunities.",
-            "opportunity_research", task.id,
-        )  # fmt: skip
+    # Everything else: MATT's conversational brain answers and acts through its tools.
+    from app.services import chat
 
-    # Open-ended: the CEO answers now, delegating follow-up work to the queue.
-    task = tasks.create(db, objective=text, created_by=actor, agent_slug="ceo", priority=1)
-    task.status, task.attempts = TaskStatus.RUNNING, 1
-    db.commit()
-    task = tasks.execute(db, task, router)
-    if task.status == TaskStatus.SUCCEEDED:
-        delegated = (task.output_data or {}).get("delegated_task_ids", [])
-        reply = task.output or "Done."
-        if delegated:
-            reply += f"\n\nI've assigned {len(delegated)} follow-up task(s) to the team."
-        return CommandResult(reply, "ceo", task.id, {"delegated_task_ids": delegated})
-    if task.status == TaskStatus.WAITING_APPROVAL:
-        return CommandResult(
-            "That needs more AI budget than you've allowed. I've put a request in Approvals.",
-            "budget", task.id,
-        )  # fmt: skip
-    return CommandResult(
-        f"I couldn't finish that: {task.error or 'unknown error'}. "
-        + ("I'll retry shortly." if task.status == TaskStatus.QUEUED else ""),
-        "error", task.id,
-    )  # fmt: skip
+    said = chat.respond(db, router, user, text)
+    return CommandResult(said.reply, said.intent, said.task_id, said.data)

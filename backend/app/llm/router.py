@@ -103,6 +103,10 @@ class ModelRouter:
     def available(self) -> bool:
         return any(self._eligible(p, 1) for p in self.providers)
 
+    def lanes(self) -> list[str]:
+        """Distinct usable providers, so parallel work can spread across free tiers."""
+        return list(dict.fromkeys(p.spec.provider for p in self.providers if self._eligible(p, 1)))
+
     def provider(self, slug: str) -> Provider | None:
         return next((p for p in self.providers if p.spec.provider == slug), None)
 
@@ -148,8 +152,11 @@ class ModelRouter:
         min_quality: int = 1,
         max_tokens: int = 4000,
         override_budget: bool = False,
+        prefer: str | None = None,
     ) -> RoutedCompletion:
         candidates = [p for p in self.providers if self._eligible(p, min_quality)]
+        if prefer:  # parallel bots each start on their own free provider, then fall back
+            candidates.sort(key=lambda p: p.spec.provider != prefer)
         if not candidates:
             raise NoModelAvailable(
                 "No AI model is configured. Set MATT_GEMINI_API_KEY (free) or another provider."
