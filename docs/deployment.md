@@ -39,8 +39,10 @@ MATT's agents need at least one model key. The cheapest is free:
 or premium model in code, and an Anthropic key is ignored. Keep billing switched off on the
 Google Cloud project behind your AI Studio key; then the key stays on the free tier and going
 over the free limit returns "429 rate limited" instead of a charge. Never upgrade the key's plan.
-MATT uses `gemini-flash-latest` by default; if Google retires a model name (a 404), MATT asks
-the API which models the key can use and switches to the current free Flash model by itself.
+MATT uses `gemini-3.8-flash` by default (Google's recommended Flash model for new keys as of
+October 2026); set `MATT_GEMINI_MODEL` in Render to pick another. If Google retires a model name
+(a 404), MATT switches to the replacement Google names in the error, or else asks the API which
+models the key can use and picks the newest Flash model, by itself.
 
 Autopilot keeps within the free limits: one main action every 15 minutes plus at most 48
 skill-bot turns a day, one at a time.
