@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { tokenStore } from "../api/client";
-import { runCommand } from "../voice/commands";
+import { isOutboundMoney, runCommand } from "../voice/commands";
 import type { Recognition, RecognitionEvent } from "../voice/speech";
 import { similarity, voiceAccepted, type Voiceprint } from "../voice/voiceprint";
 import { detectWake } from "../voice/wake";
@@ -99,6 +99,18 @@ describe("everyday skills", () => {
   it("lets the backend answer money questions and opens the page it names", async () => {
     mockApi({ "/command": { reply: "Today you've earned ₹1,500.", intent: "earnings", task_id: null, data: { navigate: "/revenue" } } });
     expect(await runCommand("how much did we earn today", ctx)).toEqual({ say: "Today you've earned ₹1,500.", navigate: "/revenue", taskId: undefined });
+  });
+
+  it("sends anything that moves money out to the backend money rule, never a local shortcut", async () => {
+    const refusal = "Main rule: MATT only receives money, into your own UPI account.";
+    const fetchMock = mockApi({ "/command": { reply: refusal, intent: "money_rule", task_id: null, data: {} } });
+    for (const cmd of ["remind me in 5 minutes to send money to Ravi", "google how to withdraw cash", "what is a refund", "open payout"]) {
+      expect(isOutboundMoney(cmd)).toBe(true);
+      expect((await runCommand(cmd, ctx)).say).toBe(refusal);
+    }
+    expect(fetchMock.mock.calls.every(([url]) => String(url).includes("/command"))).toBe(true);
+    expect(isOutboundMoney("send a payment request to FitZone for 5000 rupees")).toBe(false);
+    expect(isOutboundMoney("set a timer for 5 minutes")).toBe(false);
   });
 });
 
