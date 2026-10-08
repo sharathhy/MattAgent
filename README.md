@@ -24,7 +24,7 @@ What works today:
   audit their websites (UX, design, SEO, mobile, performance, conversion, technical), rank leads,
   and draft outreach that waits for your approval.
 - **Opportunity engine** with the spec's scoring formula, manual or AI-researched.
-- **Autopilot** (owner switch on the Command Center, or "start autopilot"): on a schedule the
+- **Autopilot** (on by default; the owner can pause it on the Command Center or say "stop autopilot"): on a schedule the
   CEO picks the next most valuable step: the daily CEO report, finding and auditing leads in
   your target cities and niches, opportunity research, and outreach drafts that wait in
   Approvals. It never sends, spends or publishes by itself.

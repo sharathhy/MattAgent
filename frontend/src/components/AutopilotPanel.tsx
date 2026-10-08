@@ -24,7 +24,7 @@ export function AutopilotPanel({ full = false }: { full?: boolean }) {
         <span className="min-w-0 flex-1 truncate text-sm text-muted">
           {s?.enabled
             ? `${s.last_action ?? "Starting"} · ${s.cycles_today} actions today${s.next_cycle_at ? ` · next ${formatDate(s.next_cycle_at)}` : ""}`
-            : "MATT works only when you ask."}
+            : "Paused by the owner. MATT works only when you ask."}
         </span>
         {canRun && s?.enabled && (
           <button type="button" className="btn bg-slate-700 text-slate-100" onClick={() => runNow.mutate(undefined)} disabled={runNow.isPending}>
