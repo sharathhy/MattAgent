@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #05070d;
+  --color-panel: rgb(15 23 42 / 0.55);
+  --color-line: rgb(56 189 248 / 0.18);
+  --color-accent: #22d3ee;
+  --color-accent-2: #a78bfa;
+  --color-ok: #34d399;
+  --color-warn: #fbbf24;
+  --color-danger: #f87171;
+  --color-muted: #94a3b8;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+body {
+  background:
+    radial-gradient(ellipse at 20% -10%, rgb(34 211 238 / 0.12), transparent 50%),
+    radial-gradient(ellipse at 90% 10%, rgb(167 139 250 / 0.10), transparent 45%),
+    var(--color-bg);
+  color: #e2e8f0;
+  min-height: 100vh;
+}
+
+@layer components {
+  .panel {
+    @apply rounded-xl border border-line bg-panel backdrop-blur-md shadow-[0_0_0_1px_rgb(34_211_238/0.03),0_8px_30px_rgb(0_0_0/0.35)];
+  }
+  .label {
+    @apply font-mono text-[11px] uppercase tracking-[0.18em] text-muted;
+  }
+  .input {
+    @apply w-full rounded-lg border border-line bg-slate-950/60 px-3 py-2 text-sm outline-none focus:border-accent focus:ring-1 focus:ring-accent;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-accent/90 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-accent disabled:opacity-50;
+  }
+}
+
+@keyframes scan {
+  from { transform: translateY(-100%); }
+  to { transform: translateY(100%); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .scanline::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom, transparent, rgb(34 211 238 / 0.06), transparent);
+    animation: scan 6s linear infinite;
+    pointer-events: none;
+  }
+}

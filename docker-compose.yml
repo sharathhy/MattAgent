@@ -1,0 +1,31 @@
+# Production-like local stack: PostgreSQL + API + web. Set MATT_SECRET_KEY and POSTGRES_PASSWORD in .env.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: matt
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: matt
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U matt"]
+      interval: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    environment:
+      MATT_ENV: production
+      MATT_DATABASE_URL: postgresql+psycopg://matt:${POSTGRES_PASSWORD}@db:5432/matt
+      MATT_SECRET_KEY: ${MATT_SECRET_KEY:?set MATT_SECRET_KEY (32+ chars)}
+      MATT_CORS_ORIGINS: '["http://localhost:8080"]'
+    depends_on:
+      db: {condition: service_healthy}
+
+  web:
+    build: ./frontend
+    ports: ["8080:80"]
+    depends_on: [backend]
+
+volumes:
+  pgdata:
