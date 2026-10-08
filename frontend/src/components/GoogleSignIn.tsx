@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 
 interface GoogleId {
-  initialize(config: { client_id: string; callback: (r: { credential: string }) => void }): void;
+  initialize(config: { client_id: string; callback: (r: { credential: string }) => void; use_fedcm_for_button?: boolean }): void;
   renderButton(el: HTMLElement, options: Record<string, string | number>): void;
 }
 declare global {
@@ -36,7 +36,13 @@ export function GoogleSignIn({ clientId, onCredential, onError }: {
       .then(() => {
         const el = ref.current;
         if (cancelled || !el || !window.google) return;
-        window.google.accounts.id.initialize({ client_id: clientId, callback: (r) => onCredential(r.credential) });
+        // FedCM lets the browser run the Google popup, so the page's COOP header no longer
+        // blocks Google's postMessage (the console warning seen at sign-in).
+        window.google.accounts.id.initialize({
+          client_id: clientId,
+          callback: (r) => onCredential(r.credential),
+          use_fedcm_for_button: true,
+        });
         window.google.accounts.id.renderButton(el, { theme: "filled_black", size: "large", shape: "pill", width: 280 });
       })
       .catch(onError);

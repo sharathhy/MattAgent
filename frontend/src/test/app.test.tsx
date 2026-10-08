@@ -115,7 +115,8 @@ const DASHBOARD = {
 };
 
 const AUTOPILOT = {
-  enabled: true, cities: ["Mysuru"], categories: ["gyms"], interval_minutes: 30, daily_outreach_drafts: 5,
+  enabled: true, cities: ["Mysuru"], categories: ["gyms"], interval_minutes: 15, daily_outreach_drafts: 5, daily_bot_tasks: 48, bots_today: 2,
+  last_tick_at: "2026-10-08T10:00:00Z", free_models_only: true,
   last_cycle_at: null, next_cycle_at: null, last_action: "Find gyms in Mysuru and rank website opportunities",
   cycles_today: 3, active: 1, ai_model_available: false, available_categories: ["gyms", "clinics"],
   recent: [], latest_report: null,
@@ -142,6 +143,8 @@ describe("command center", () => {
     expect(screen.getByText("AI Cost Today").parentElement).toHaveTextContent("No AI model key set");
     expect(screen.getByText("Find gyms in Mysore")).toBeInTheDocument();
     expect(await screen.findByText("Autopilot on")).toBeInTheDocument();
+    expect(screen.getByText(/AI: free-tier models only/)).toBeInTheDocument();
+    expect(screen.getByText(/2 skill-bot turns/)).toBeInTheDocument();
     expect(screen.getByRole("switch", { name: "Autopilot" })).toHaveAttribute("aria-checked", "true");
     await waitFor(() => expect(screen.getByText(/System ok/)).toBeInTheDocument());
   });

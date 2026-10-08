@@ -371,6 +371,7 @@ export interface SystemSettings {
   google_sign_in: boolean;
   models: { provider: string; model: string; tier: string; quality: number; paid: boolean; rate_limit: string; enabled: boolean }[];
   model_keys: Record<string, boolean>;
+  free_models_only: boolean;
   allow_premium_models: boolean;
   daily_ai_budget_inr: number;
   monthly_ai_budget_inr: number;
@@ -384,6 +385,10 @@ export interface AutopilotStatus {
   categories: string[];
   interval_minutes: number;
   daily_outreach_drafts: number;
+  daily_bot_tasks: number;
+  bots_today: number;
+  last_tick_at: string | null;
+  free_models_only: boolean;
   last_cycle_at: string | null;
   next_cycle_at: string | null;
   last_action: string | null;

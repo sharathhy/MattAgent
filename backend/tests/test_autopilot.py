@@ -143,3 +143,72 @@ def test_rows_left_off_by_an_old_version_turn_on(db: Session) -> None:
     db.add(Autopilot(enabled=False, cities=["Mysuru"], categories=["gyms"]))
     db.commit()
     assert autopilot.get(db).enabled is True
+
+
+def test_each_cycle_gives_a_skill_its_own_turn(
+    client: TestClient,
+    owner_headers: dict[str, str],
+    seeded: None,
+    offline: None,
+    settings: Settings,
+    db: Session,
+) -> None:
+    from sqlalchemy import select
+
+    from app.models import Knowledge
+
+    provider = free(["RECOMMENDATION: call the top lead after approval."])
+    client.app.state.model_router = ModelRouter(settings, providers=[provider])  # type: ignore[attr-defined]
+    router = _router(client)
+    autopilot.tick(db, router, force=True)
+    bots = [t for t in db.query(Task).all() if t.input.get("workflow") == "skill_bot"]
+    assert len(bots) == 1 and bots[0].created_by == "autopilot"
+    drain(db, router)
+    db.refresh(bots[0])
+    assert bots[0].status == "succeeded"
+    note = db.scalars(select(Knowledge).where(Knowledge.kind == "agent")).one()
+    assert (
+        note.agent_slug == bots[0].input["params"]["agent_slug"]
+        and "RECOMMENDATION" in note.content
+    )
+    status = client.get("/api/autopilot", headers=owner_headers).json()
+    assert status["bots_today"] == 1 and status["last_tick_at"] and status["free_models_only"]
+
+    row = autopilot.get(db)
+    row.daily_bot_tasks = 1
+    db.commit()
+    autopilot.tick(db, router, force=True)
+    assert len([t for t in db.query(Task).all() if t.input.get("workflow") == "skill_bot"]) == 1
+
+
+def test_no_bots_without_a_model_and_heartbeat_when_idle(
+    client: TestClient, owner_headers: dict[str, str], seeded: None, settings: Settings, db: Session
+) -> None:
+    router = ModelRouter(settings, providers=[])
+    autopilot.tick(db, router, force=True)
+    assert not [t for t in db.query(Task).all() if t.input.get("workflow") == "skill_bot"]
+    assert autopilot.get(db).last_tick_at is not None
+
+
+def test_report_is_saved_even_when_the_ai_fails(
+    client: TestClient, owner_headers: dict[str, str], seeded: None, settings: Settings, db: Session
+) -> None:
+    router = ModelRouter(settings, providers=[free(fail=True)])
+    task = autopilot.tick(db, router, force=True)
+    assert task is not None and task.input["workflow"] == "daily_report"
+    drain(db, router)
+    db.refresh(task)
+    assert task.status == "succeeded"
+    report = autopilot.status(db, router)["latest_report"]
+    assert report and "AI recommendations unavailable" in report["content"]
+    # The day has its report, so the next cycle moves on instead of retrying it.
+    nxt = autopilot.tick(db, router, force=True)
+    assert nxt is not None and nxt.input["workflow"] != "daily_report"
+
+
+def test_old_30_minute_rows_move_to_15(db: Session) -> None:
+    from app.models import Autopilot
+
+    db.add(Autopilot(enabled=True, cities=["Mysuru"], categories=["gyms"], interval_minutes=30))
+    db.commit()
+    assert autopilot.get(db).interval_minutes == 15

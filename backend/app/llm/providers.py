@@ -1,7 +1,7 @@
 """Model providers behind one interface. Each returns text plus token usage."""
 
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Protocol
 
 import anthropic
@@ -90,6 +90,54 @@ class OpenAICompatibleProvider:
             completion_tokens=int(usage.get("completion_tokens", 0)),
             latency_ms=int((time.perf_counter() - start) * 1000),
         )
+
+
+class GeminiProvider(OpenAICompatibleProvider):
+    """Gemini through its OpenAI-compatible endpoint, free tier.
+
+    Google retires model names over time. If the configured name returns 404, the provider asks
+    the API which models this key can use, switches to the newest general "flash" model, and
+    retries once, so a retired name never stops MATT.
+    """
+
+    PREFERRED = ("gemini-flash-latest", "gemini-flash-lite-latest")
+    SKIP = ("image", "tts", "audio", "live", "embedding", "exp", "thinking", "vision", "pro")
+
+    def complete(self, system: str, prompt: str, max_tokens: int) -> Completion:
+        try:
+            return super().complete(system, prompt, max_tokens)
+        except ProviderError as exc:
+            if "HTTP 404" not in str(exc):
+                raise
+            current = self.discover_model()
+            if current is None or current == self.spec.model:
+                raise
+            self.spec = replace(self.spec, model=current)
+            return super().complete(system, prompt, max_tokens)
+
+    def discover_model(self) -> str | None:
+        try:
+            r = httpx.get(
+                f"{self.base_url}/models",
+                headers={"Authorization": f"Bearer {self.api_key}"},
+                timeout=30,
+            )
+            r.raise_for_status()
+            ids = [str(m.get("id", "")).removeprefix("models/") for m in r.json().get("data", [])]
+        except (httpx.HTTPError, ValueError, AttributeError):
+            return None
+        return pick_gemini_model(ids, self.PREFERRED, self.SKIP)
+
+
+def pick_gemini_model(
+    ids: list[str], preferred: tuple[str, ...], skip: tuple[str, ...]
+) -> str | None:
+    for name in preferred:
+        if name in ids:
+            return name
+    flash = [i for i in ids if "flash" in i and not any(word in i for word in skip)]
+    stable = [i for i in flash if "preview" not in i] or flash
+    return sorted(stable, reverse=True)[0] if stable else None
 
 
 class AnthropicProvider:

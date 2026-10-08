@@ -18,6 +18,7 @@ from app.core.config import Settings
 from app.llm.providers import (
     AnthropicProvider,
     Completion,
+    GeminiProvider,
     ModelSpec,
     OpenAICompatibleProvider,
     Provider,
@@ -28,6 +29,7 @@ from app.models import ModelUsage
 log = logging.getLogger(__name__)
 
 TIER_ORDER = {"local": 0, "free": 1, "low": 2, "premium": 3}
+FREE_TIERS = frozenset({"local", "free"})
 
 
 class NoModelAvailable(RuntimeError):
@@ -57,7 +59,7 @@ def build_providers(settings: Settings) -> list[Provider]:
         )
     if settings.gemini_api_key:
         providers.append(
-            OpenAICompatibleProvider(
+            GeminiProvider(
                 ModelSpec(
                     "gemini",
                     settings.gemini_model,
@@ -85,7 +87,7 @@ def build_providers(settings: Settings) -> list[Provider]:
                 settings.groq_api_key,
             )
         )
-    if settings.anthropic_api_key:
+    if settings.anthropic_api_key and not settings.free_models_only:
         providers.append(
             AnthropicProvider(
                 ModelSpec(
@@ -118,10 +120,14 @@ class ModelRouter:
     def catalog(self) -> list[ModelSpec]:
         return [p.spec for p in self.providers]
 
-    def _eligible(self, p: Provider, min_quality: int) -> bool:
-        if p.spec.quality < min_quality:
+    def allowed(self, spec: ModelSpec) -> bool:
+        """Whether settings let MATT call this model at all (free-only lock, premium opt-in)."""
+        if self.settings.free_models_only and (spec.paid or spec.tier not in FREE_TIERS):
             return False
-        return p.spec.tier != "premium" or self.settings.allow_premium_models
+        return spec.tier != "premium" or self.settings.allow_premium_models
+
+    def _eligible(self, p: Provider, min_quality: int) -> bool:
+        return p.spec.quality >= min_quality and self.allowed(p.spec)
 
     def spent_inr(self, db: Session, since: datetime) -> Decimal:
         total = db.scalar(

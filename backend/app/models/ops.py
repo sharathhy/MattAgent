@@ -125,10 +125,15 @@ class Autopilot(TimestampMixin, Base):
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     cities: Mapped[list[str]] = mapped_column(JSON, default=list)
     categories: Mapped[list[str]] = mapped_column(JSON, default=list)
-    interval_minutes: Mapped[int] = mapped_column(Integer, default=30)
+    interval_minutes: Mapped[int] = mapped_column(Integer, default=15)
     daily_outreach_drafts: Mapped[int] = mapped_column(Integer, default=5)
     cursor: Mapped[int] = mapped_column(Integer, default=0)
     last_cycle_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     next_cycle_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_action: Mapped[str | None] = mapped_column(String(300))
     updated_by: Mapped[str | None] = mapped_column(String(100))
+    #: Heartbeat: when the background scheduler last checked in (proves it runs on its own).
+    last_tick_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    #: Skill bots: how many independent skill turns a day (kept well inside free AI limits).
+    daily_bot_tasks: Mapped[int] = mapped_column(Integer, default=48, server_default="48")
+    bot_cursor: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
