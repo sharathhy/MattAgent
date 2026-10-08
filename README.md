@@ -24,6 +24,12 @@ What works today:
   audit their websites (UX, design, SEO, mobile, performance, conversion, technical), rank leads,
   and draft outreach that waits for your approval.
 - **Opportunity engine** with the spec's scoring formula, manual or AI-researched.
+- **Alexa-style commands** that need no AI key: "how much did we earn today", "record 15k
+  received for a website project", "which skills are earning", "what's pending", "top leads",
+  "remember that...", "open revenue", "what time is it". Anything else goes to the CEO agent.
+- **Earnings:** today, 7-day, month and total revenue from the ledger (business timezone
+  `MATT_TIMEZONE`, default Asia/Kolkata), a 30-day daily series, revenue by stream, and which
+  skills earned it.
 - **Command endpoint** for typed or spoken commands, an event feed, a live dashboard and
   analytics computed from stored records.
 - **Business records:** customers, products, a revenue and expense ledger (facts you enter),

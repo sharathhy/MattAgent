@@ -266,6 +266,7 @@ export interface LedgerEntry extends Row {
   description: string;
   occurred_on: string;
   recurring: boolean;
+  agent_slug: string | null;
   recorded_by: string;
 }
 
@@ -290,9 +291,35 @@ export interface Knowledge extends Row {
   expires_at: string | null;
 }
 
+export interface EarningSkill {
+  slug: string;
+  name: string;
+  revenue_inr: number;
+  revenue_today_inr: number;
+  revenue_month_inr: number;
+}
+
+export interface Earnings {
+  truth: string;
+  timezone: string;
+  date: string;
+  today_inr: number;
+  expenses_today_inr: number;
+  week_inr: number;
+  month_inr: number;
+  total_inr: number;
+  daily: { day: string; revenue_inr: number; expense_inr: number }[];
+  by_stream: { category: string; month_inr: number; total_inr: number }[];
+  earning_agents: { slug: string; name: string; today_inr: number; month_inr: number; total_inr: number; last_earned_on: string }[];
+}
+
 export interface Dashboard {
+  earnings: Earnings;
   revenue: {
     truth: string;
+    today_inr: number;
+    week_inr: number;
+    earning_skills: EarningSkill[];
     month_inr: number;
     total_inr: number;
     expenses_month_inr: number;

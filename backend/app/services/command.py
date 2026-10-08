@@ -15,7 +15,7 @@ from app.core.domain import ApprovalStatus, TaskStatus
 from app.llm.router import ModelRouter
 from app.models import Approval, Lead, Task, User
 from app.plugins.business_discovery import CATEGORIES
-from app.services import events, tasks
+from app.services import assistant, events, tasks
 
 SYNONYMS = {
     "restaurant": "restaurants", "cafe": "restaurants", "cafes": "restaurants",
@@ -84,6 +84,9 @@ def handle(db: Session, router: ModelRouter, user: User, text: str) -> CommandRe
     db.commit()
     if not text or WAKE.match(text):
         return CommandResult(WAKE_REPLY, "wake")
+
+    if quick := assistant.answer(db, user, text, router.settings.timezone):
+        return CommandResult(quick.reply, quick.intent, None, quick.data)
 
     if (m := FIND.search(text)) and (category := _category(text)):
         city = m.group(2).strip().title()

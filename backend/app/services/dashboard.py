@@ -20,6 +20,7 @@ from app.models import (
     Opportunity,
     Task,
 )
+from app.services import earnings
 
 
 def _num(v: Any) -> float:
@@ -41,7 +42,7 @@ def _group(db: Session, column: Any) -> dict[str, int]:
 
 def overview(db: Session, router: ModelRouter, settings: Settings) -> dict[str, Any]:
     now = datetime.now(UTC)
-    month_start = now.date().replace(day=1)
+    month_start = earnings.today(settings.timezone).replace(day=1)
     day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     tasks_by_status = _group(db, Task.status)
     agents_active = db.scalar(
@@ -57,9 +58,23 @@ def overview(db: Session, router: ModelRouter, settings: Settings) -> dict[str, 
     top_opps = db.scalars(select(Opportunity).order_by(Opportunity.score.desc()).limit(5)).all()
     revenue_month = _ledger_total(db, "revenue", month_start)
     expense_month = _ledger_total(db, "expense", month_start)
+    earned = earnings.summary(db, settings.timezone)
     return {
+        "earnings": earned,
         "revenue": {
             "truth": "fact",
+            "today_inr": earned["today_inr"],
+            "week_inr": earned["week_inr"],
+            "earning_skills": [
+                {
+                    "slug": a["slug"],
+                    "name": a["name"],
+                    "revenue_inr": a["total_inr"],
+                    "revenue_today_inr": a["today_inr"],
+                    "revenue_month_inr": a["month_inr"],
+                }
+                for a in earned["earning_agents"]
+            ],
             "month_inr": revenue_month,
             "total_inr": _ledger_total(db, "revenue"),
             "expenses_month_inr": expense_month,

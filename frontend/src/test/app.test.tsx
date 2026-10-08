@@ -99,7 +99,11 @@ describe("authentication", () => {
 });
 
 const DASHBOARD = {
-  revenue: { truth: "fact", month_inr: 25000, total_inr: 25000, expenses_month_inr: 5000, profit_month_inr: 20000, entries: 2 },
+  earnings: { truth: "fact", timezone: "Asia/Kolkata", date: "2026-10-08", today_inr: 5000, expenses_today_inr: 0,
+    week_inr: 25000, month_inr: 25000, total_inr: 25000, daily: [], by_stream: [], earning_agents: [] },
+  revenue: { truth: "fact", today_inr: 5000, week_inr: 25000,
+    earning_skills: [{ slug: "sales-copywriter", name: "Sales Copywriter", revenue_inr: 25000, revenue_today_inr: 5000, revenue_month_inr: 25000 }],
+    month_inr: 25000, total_inr: 25000, expenses_month_inr: 5000, profit_month_inr: 20000, entries: 2 },
   tasks: { by_status: { succeeded: 3, failed: 1 }, active: 2, recent: [
     { id: 7, objective: "Find gyms in Mysore", status: "running", agent: null, kind: "workflow", created_at: "2026-10-08T00:00:00Z" },
   ] },
@@ -124,6 +128,8 @@ describe("command center", () => {
     expect(tile).toHaveTextContent("120");
     await waitFor(() => expect(screen.getByText("Revenue This Month").parentElement).toHaveTextContent("₹25,000"));
     expect(screen.getByText("Profit This Month").parentElement).toHaveTextContent("₹20,000");
+    expect(screen.getByText("Revenue Today").parentElement).toHaveTextContent("₹5,000");
+    expect(screen.getByText("Skills Earning").parentElement).toHaveTextContent("Sales Copywriter");
     expect(screen.getByText("Pipeline").parentElement).toHaveTextContent(/Assumption/);
     expect(screen.getByText("AI Cost Today").parentElement).toHaveTextContent("No AI model key set");
     expect(screen.getByText("Find gyms in Mysore")).toBeInTheDocument();

@@ -51,6 +51,8 @@ class Settings(BaseSettings):
     daily_ai_budget_inr: float = Field(default=0, ge=0)
     monthly_ai_budget_inr: float = Field(default=0, ge=0)
     usd_to_inr: float = Field(default=84.0, gt=0)
+    #: Business timezone: decides what "today" means for revenue.
+    timezone: str = "Asia/Kolkata"
 
     # --- Background worker ---
     worker_enabled: bool = True
