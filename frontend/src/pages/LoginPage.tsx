@@ -1,13 +1,28 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState, type FormEvent } from "react";
+import { useCallback, useState, type FormEvent, type ReactNode } from "react";
 import { Navigate } from "react-router-dom";
 
 import { api } from "../api/client";
+import { GoogleSignIn } from "../components/GoogleSignIn";
 import { ErrorState, Loading } from "../components/ui";
 import { useAuth } from "../lib/auth";
 
+function Shell({ subtitle, children }: { subtitle: string; children: ReactNode }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center p-4">
+      <div className="panel scanline relative w-full max-w-sm space-y-4 overflow-hidden p-8">
+        <div className="text-center">
+          <div className="font-mono text-3xl font-bold tracking-[0.4em] text-accent">MATT</div>
+          <div className="label mt-2">{subtitle}</div>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export function LoginPage() {
-  const { user, login } = useAuth();
+  const { user, login, loginWithGoogle } = useAuth();
   const qc = useQueryClient();
   const status = useQuery({ queryKey: ["auth-status"], queryFn: api.authStatus });
   const [email, setEmail] = useState("");
@@ -17,20 +32,47 @@ export function LoginPage() {
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
 
+  const onGoogleCredential = useCallback(
+    (credential: string) => {
+      setError(null);
+      loginWithGoogle(credential).catch(setError);
+    },
+    [loginWithGoogle],
+  );
+
   if (user) return <Navigate to="/command-center" replace />;
   if (status.isPending) return <Loading label="Connecting to MATT" />;
   if (status.isError) return <div className="p-8"><ErrorState error={status.error} /></div>;
 
-  const { bootstrap_required: bootstrap, setup_code_required: needsCode, web_bootstrap_enabled } = status.data;
+  const {
+    bootstrap_required: bootstrap,
+    setup_code_required: needsCode,
+    web_bootstrap_enabled,
+    google_client_id: googleClientId,
+  } = status.data;
+  // On a locked-down install with no owner yet, only the owner's Google account can get in.
+  const showPasswordForm = !bootstrap || web_bootstrap_enabled;
 
-  if (bootstrap && !web_bootstrap_enabled) {
+  const google = googleClientId && (
+    <GoogleSignIn clientId={googleClientId} onCredential={onGoogleCredential} onError={setError} />
+  );
+
+  if (!showPasswordForm) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-4">
-        <div className="panel max-w-sm p-8 text-center text-sm text-muted">
-          No owner account exists yet. Create it on the server with{" "}
-          <code className="font-mono text-accent">matt create-owner --email you@example.com</code>.
-        </div>
-      </div>
+      <Shell subtitle="Owner sign-in">
+        {google ? (
+          <>
+            <p className="text-center text-xs text-muted">Sign in with the owner's Google account to set up MATT.</p>
+            {google}
+          </>
+        ) : (
+          <p className="text-center text-sm text-muted">
+            No owner account exists yet. Create it on the server with{" "}
+            <code className="font-mono text-accent">matt create-owner --email you@example.com</code>.
+          </p>
+        )}
+        {error !== null && <ErrorState error={error} />}
+      </Shell>
     );
   }
 
@@ -52,12 +94,14 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
-      <form onSubmit={submit} className="panel scanline relative w-full max-w-sm space-y-4 overflow-hidden p-8">
-        <div className="text-center">
-          <div className="font-mono text-3xl font-bold tracking-[0.4em] text-accent">MATT</div>
-          <div className="label mt-2">{bootstrap ? "Initialise owner account" : "Command Center access"}</div>
-        </div>
+    <Shell subtitle={bootstrap ? "Initialise owner account" : "Command Center access"}>
+      {google && (
+        <>
+          {google}
+          <div className="label text-center">or</div>
+        </>
+      )}
+      <form onSubmit={submit} className="space-y-4">
         {bootstrap && (
           <p className="text-xs text-muted">
             No accounts exist yet. The first account becomes the owner, with final authority over every agent.
@@ -96,6 +140,6 @@ export function LoginPage() {
           {bootstrap ? "Create owner and sign in" : "Sign in"}
         </button>
       </form>
-    </div>
+    </Shell>
   );
 }

@@ -22,6 +22,10 @@ class CreateUserRequest(NewUser):
     role: Role = Role.VIEWER
 
 
+class GoogleSignInRequest(BaseModel):
+    credential: str = Field(min_length=20, max_length=4096)
+
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"  # noqa: S105
@@ -44,3 +48,5 @@ class AuthStatus(BaseModel):
     setup_code_required: bool
     #: False when the owner must be created with the ``matt create-owner`` command instead.
     web_bootstrap_enabled: bool
+    #: Public OAuth client id when "Sign in with Google" is enabled.
+    google_client_id: str | None

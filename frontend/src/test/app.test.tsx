@@ -56,6 +56,36 @@ describe("authentication", () => {
     expect(tokenStore.get()).toBe("tok");
   });
 
+  it("signs the owner in with Google on a locked-down install", async () => {
+    let callback: ((r: { credential: string }) => void) | undefined;
+    vi.stubGlobal("google", {
+      accounts: {
+        id: {
+          initialize: (c: { callback: typeof callback }) => (callback = c.callback),
+          renderButton: (el: HTMLElement) => {
+            const b = document.createElement("button");
+            b.textContent = "Sign in with Google";
+            b.onclick = () => callback?.({ credential: "google-id-token" });
+            el.appendChild(b);
+          },
+        },
+      },
+    });
+    const fetchMock = mockApi({
+      "/auth/status": { bootstrap_required: true, setup_code_required: false, web_bootstrap_enabled: false, google_client_id: "cid" },
+      "/auth/google": { access_token: "tok" },
+      "/auth/me": OWNER,
+      "/agents/summary": SUMMARY,
+      "/health": { status: "ok", database: "ok", env: "test" },
+    });
+    renderApp("/login");
+    expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
+    await userEvent.click(await screen.findByRole("button", { name: "Sign in with Google" }));
+    expect(await screen.findByText("MATT COMMAND CENTER")).toBeInTheDocument();
+    const call = fetchMock.mock.calls.find(([url]) => String(url).endsWith("/auth/google"));
+    expect(JSON.parse(String(call?.[1]?.body))).toEqual({ credential: "google-id-token" });
+  });
+
   it("returns to login when the session is rejected", async () => {
     tokenStore.set("expired");
     mockApi({

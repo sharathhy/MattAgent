@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from app.api.middleware import request_context
 from app.api.routes import agents, audit, auth, health
 from app.core.config import Settings, get_settings
+from app.core.google import GoogleTokenVerifier
 from app.core.logging import configure_logging
 from app.core.rate_limit import RateLimiter
 from app.services.errors import ServiceError
@@ -32,6 +33,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.state.login_limiter = RateLimiter(
         settings.login_rate_limit, settings.login_rate_window_seconds
+    )
+    app.state.google_verifier = (
+        GoogleTokenVerifier(settings.google_client_id) if settings.google_client_id else None
     )
 
     app.middleware("http")(request_context)

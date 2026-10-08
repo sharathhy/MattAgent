@@ -21,8 +21,13 @@ SECURITY_HEADERS = {
 API_CSP = "default-src 'none'; frame-ancestors 'none'"
 #: For the web app when the API process also serves it (single-service deployments).
 WEB_CSP = (
-    "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
-    "connect-src 'self'; frame-ancestors 'none'"
+    "default-src 'self'; "
+    "script-src 'self' https://accounts.google.com/gsi/client; "
+    "style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style; "
+    "frame-src https://accounts.google.com/gsi/; "
+    "connect-src 'self' https://accounts.google.com/gsi/; "
+    "img-src 'self' data: https://*.googleusercontent.com; "
+    "frame-ancestors 'none'"
 )
 
 
@@ -50,7 +55,10 @@ async def request_context(
     path = request.url.path
     if not path.startswith(("/docs", "/redoc", "/openapi.json")):
         response.headers.update(SECURITY_HEADERS)
-        response.headers["Content-Security-Policy"] = (
-            API_CSP if path.startswith("/api") else WEB_CSP
-        )
+        if path.startswith("/api"):
+            response.headers["Content-Security-Policy"] = API_CSP
+        else:
+            response.headers["Content-Security-Policy"] = WEB_CSP
+            # Google Sign-In checks the page origin, which "no-referrer" would hide.
+            response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     return response

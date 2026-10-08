@@ -8,6 +8,7 @@ def test_bootstrap_only_once(client: TestClient) -> None:
         "bootstrap_required": True,
         "setup_code_required": False,
         "web_bootstrap_enabled": True,
+        "google_client_id": None,
     }
     r = client.post("/api/auth/bootstrap", json=OWNER)
     assert r.status_code == 201

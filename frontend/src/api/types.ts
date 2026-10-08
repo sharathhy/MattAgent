@@ -98,4 +98,5 @@ export interface AuthStatus {
   bootstrap_required: boolean;
   setup_code_required: boolean;
   web_bootstrap_enabled: boolean;
+  google_client_id: string | null;
 }

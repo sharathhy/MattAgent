@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from app.api.deps import AppSettings, CurrentUser, DbSession, require_role
 from app.core.config import Settings
 from app.core.domain import Role
+from app.core.google import GoogleTokenError, GoogleTokenVerifier
 from app.core.rate_limit import RateLimiter
 from app.core.security import create_access_token
 from app.models import User
@@ -14,6 +15,7 @@ from app.schemas.auth import (
     AuthStatus,
     BootstrapRequest,
     CreateUserRequest,
+    GoogleSignInRequest,
     LoginRequest,
     TokenResponse,
     UserOut,
@@ -38,6 +40,7 @@ def auth_status(db: DbSession, settings: AppSettings) -> AuthStatus:
         bootstrap_required=user_repo.count(db) == 0,
         setup_code_required=settings.bootstrap_token is not None,
         web_bootstrap_enabled=_web_bootstrap_enabled(settings),
+        google_client_id=settings.google_client_id,
     )
 
 
@@ -81,6 +84,31 @@ def login(
     user = auth_service.authenticate(db, body.email, body.password)
     if user is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid email or password")
+    return TokenResponse(
+        access_token=create_access_token(str(user.id), settings),
+        expires_in=settings.access_token_minutes * 60,
+    )
+
+
+@router.post("/google", response_model=TokenResponse)
+def google_sign_in(
+    body: GoogleSignInRequest,
+    request: Request,
+    db: DbSession,
+    settings: AppSettings,
+    limiter: Annotated[RateLimiter, Depends(_login_limiter)],
+) -> TokenResponse:
+    verifier: GoogleTokenVerifier | None = request.app.state.google_verifier
+    if verifier is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Google sign-in is not configured")
+    client = request.client.host if request.client else "unknown"
+    if not limiter.allow(f"google:{client}"):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "Too many attempts; try later")
+    try:
+        identity = verifier.verify(body.credential)
+    except GoogleTokenError as exc:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Google sign-in failed") from exc
+    user = auth_service.sign_in_with_google(db, identity, settings.owner_email)
     return TokenResponse(
         access_token=create_access_token(str(user.id), settings),
         expires_in=settings.access_token_minutes * 60,

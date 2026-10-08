@@ -8,6 +8,7 @@ interface AuthState {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: (credential: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -31,14 +32,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => setUnauthorizedHandler(logout), [logout]);
 
-  const login = useCallback(
-    async (email: string, password: string) => {
-      const { access_token } = await api.login(email, password);
+  const accept = useCallback(
+    async (access_token: string) => {
       tokenStore.set(access_token);
       await qc.fetchQuery({ queryKey: ["me", access_token], queryFn: api.me });
       setToken(access_token);
     },
     [qc],
+  );
+  const login = useCallback(
+    async (email: string, password: string) => accept((await api.login(email, password)).access_token),
+    [accept],
+  );
+  const loginWithGoogle = useCallback(
+    async (credential: string) => accept((await api.googleSignIn(credential)).access_token),
+    [accept],
   );
 
   const value = useMemo<AuthState>(
@@ -46,9 +54,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user: token ? (me.data ?? null) : null,
       loading: token !== null && me.isPending,
       login,
+      loginWithGoogle,
       logout,
     }),
-    [token, me.data, me.isPending, login, logout],
+    [token, me.data, me.isPending, login, loginWithGoogle, logout],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

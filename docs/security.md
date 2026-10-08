@@ -5,7 +5,9 @@
 - **Authentication:** bcrypt password hashes; HS256 JWT access tokens with expiry. Owner account
   can only be bootstrapped while no users exist. In production the web bootstrap needs the
   `MATT_BOOTSTRAP_TOKEN` setup code (compared in constant time, rate limited), or is disabled
-  when no code is configured.
+  when no code is configured. Google sign-in verifies ID tokens server-side (signature, audience,
+  issuer, expiry, verified email); only `MATT_OWNER_EMAIL` can become owner, and only while no
+  accounts exist. Google-only accounts have no usable password.
 - **Authorization:** RBAC (owner > admin > operator > viewer) enforced per route. Only the owner
   creates users and changes agent permissions; admins can move agents through the lifecycle.
 - **No silent escalation:** agent permission changes are owner-only, versioned and audited, with

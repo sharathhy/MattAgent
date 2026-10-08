@@ -28,11 +28,24 @@ class Settings(BaseSettings):
     #: Setup code required to create the owner account through the web UI. In production the web
     #: bootstrap is disabled unless this is set; ``matt create-owner`` always works.
     bootstrap_token: str | None = None
+    #: Google OAuth client id (public) enabling "Sign in with Google".
+    google_client_id: str | None = None
+    #: The owner's email. The first Google sign-in with this verified email becomes the owner;
+    #: no other account can claim ownership.
+    owner_email: str | None = None
     #: Built frontend to serve from the API process (single-service deployments).
     static_dir: str | None = None
 
     login_rate_limit: int = Field(default=10, ge=1, description="Login attempts per window")
     login_rate_window_seconds: int = Field(default=60, ge=1)
+
+    @field_validator(
+        "bootstrap_token", "google_client_id", "owner_email", "static_dir", mode="before"
+    )
+    @classmethod
+    def _blank_is_unset(cls, value: object) -> object:
+        """Hosting dashboards often store unused variables as empty strings."""
+        return None if isinstance(value, str) and not value.strip() else value
 
     @field_validator("database_url")
     @classmethod

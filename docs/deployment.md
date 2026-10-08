@@ -24,8 +24,24 @@ root `Dockerfile`) plus a free PostgreSQL database.
 (the first request after a while takes up to a minute), and Render's free PostgreSQL expires
 after a fixed period, so upgrade the database plan before relying on the data.
 
-Without `MATT_BOOTSTRAP_TOKEN`, a production deployment disables web sign-up entirely and the
-owner must be created with `matt create-owner`.
+Without `MATT_BOOTSTRAP_TOKEN`, a production deployment disables password sign-up; the owner
+signs in with Google (below) or is created with `matt create-owner`.
+
+## Sign in with Google
+
+Only the OAuth **client ID** is needed, and it is not a secret.
+
+1. In [Google Cloud Console](https://console.cloud.google.com/apis/credentials), configure the
+   OAuth consent screen (External; while in Testing, add your own Google account as a test user).
+2. Create credentials → OAuth client ID → Web application. Under **Authorized JavaScript
+   origins** add your site's URL, e.g. `https://matt-xxxx.onrender.com` (and
+   `http://localhost:5173` for development). No redirect URI is needed.
+3. Set `MATT_GOOGLE_CLIENT_ID` to the client ID and `MATT_OWNER_EMAIL` to your Google address.
+
+The first Google sign-in with `MATT_OWNER_EMAIL` while no accounts exist creates the owner. Any
+other Google account is refused unless the owner has created an account for that email. The
+backend verifies the token's signature against Google's keys, plus audience, issuer, expiry and
+verified email.
 
 ## Docker Compose
 

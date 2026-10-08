@@ -67,6 +67,8 @@ export const api = {
     post<User>("/auth/bootstrap", body),
   login: (email: string, password: string) =>
     post<{ access_token: string }>("/auth/login", { email, password }),
+  googleSignIn: (credential: string) =>
+    post<{ access_token: string }>("/auth/google", { credential }),
   me: () => request<User>("/auth/me"),
   agents: (filters: AgentFilters = {}) => {
     const params = new URLSearchParams(
