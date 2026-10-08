@@ -70,6 +70,9 @@ export async function runCommand(raw: string, ctx: CommandContext): Promise<Comm
 
   if (isOutboundMoney(text)) return askAgents(text);
 
+  // "Stop trading" is the trading kill switch: always send it straight to the backend.
+  if (/\b(?:stop|halt|kill|pause|freeze)\b.{0,20}\btrad(?:ing|es)\b|\bkill switch\b/i.test(text)) return askAgents(text);
+
   if (has(t, "sign out", "log out", "logout")) return { say: `Signing you out, ${ctx.userName}.`, logout: true };
 
   // Only a bare "help": "help me write an email" is a real request for the brain.

@@ -49,8 +49,9 @@ def tick_round(price: float) -> float:
 
 
 class KiteClient:
-    def __init__(self, api_key: str, access_token: str | None = None,
-                 http: httpx.Client | None = None) -> None:  # fmt: skip
+    def __init__(
+        self, api_key: str, access_token: str | None = None, http: httpx.Client | None = None
+    ) -> None:
         self.api_key, self.access_token = api_key, access_token
         self.http = http or httpx.Client(base_url=KITE_API, timeout=15)
 
@@ -72,8 +73,11 @@ class KiteClient:
 
     def create_session(self, request_token: str, api_secret: str) -> str:
         checksum = hashlib.sha256((self.api_key + request_token + api_secret).encode()).hexdigest()
-        data = self._call("POST", "/session/token", {
-            "api_key": self.api_key, "request_token": request_token, "checksum": checksum})  # fmt: skip
+        data = self._call(
+            "POST",
+            "/session/token",
+            {"api_key": self.api_key, "request_token": request_token, "checksum": checksum},
+        )
         self.access_token = str(data["access_token"])
         return self.access_token
 
@@ -82,9 +86,15 @@ class KiteClient:
         return float((data.get("available") or {}).get("live_balance") or data.get("net") or 0)
 
     def place(self, symbol: str, txn: str, qty: int, *, trigger: float | None = None) -> str:
-        form = {"tradingsymbol": symbol, "exchange": "NSE", "transaction_type": txn,
-                "quantity": str(qty), "product": "MIS", "validity": "DAY",
-                "order_type": "MARKET" if trigger is None else "SL-M"}  # fmt: skip
+        form = {
+            "tradingsymbol": symbol,
+            "exchange": "NSE",
+            "transaction_type": txn,
+            "quantity": str(qty),
+            "product": "MIS",
+            "validity": "DAY",
+            "order_type": "MARKET" if trigger is None else "SL-M",
+        }
         if trigger is not None:
             form["trigger_price"] = f"{tick_round(trigger):.2f}"
         return str(self._call("POST", "/orders/regular", form)["order_id"])

@@ -14,7 +14,10 @@ from app.trading.market import Candle
 Params = dict[str, float]
 Signals = Callable[[list[Candle], Params], list[int]]
 
-COMMON: dict[str, tuple[float, float, bool]] = {"stop_atr": (1.0, 3.0, False), "rr": (1.0, 3.0, False)}
+COMMON: dict[str, tuple[float, float, bool]] = {
+    "stop_atr": (1.0, 3.0, False),
+    "rr": (1.0, 3.0, False),
+}
 
 
 def _cross(a: list[float], b: list[float], i: int) -> int:
@@ -40,8 +43,10 @@ def ema_cross(c: list[Candle], p: Params) -> list[int]:
 def rsi_reversion(c: list[Candle], p: Params) -> list[int]:
     r = ind.rsi([x[4] for x in c], int(p["period"]))
     lo, hi = p["low"], 100 - p["low"]
-    return [1 if i and r[i - 1] < lo <= r[i] else -1 if i and r[i - 1] > hi >= r[i] else 0
-            for i in range(len(c))]  # fmt: skip
+    return [
+        1 if i and r[i - 1] < lo <= r[i] else -1 if i and r[i - 1] > hi >= r[i] else 0
+        for i in range(len(c))
+    ]
 
 
 def vwap_trend(c: list[Candle], p: Params) -> list[int]:
@@ -80,9 +85,14 @@ def orb(c: list[Candle], p: Params) -> list[int]:
 def bollinger_reversion(c: list[Candle], p: Params) -> list[int]:
     closes = [x[4] for x in c]
     up, lo = ind.bollinger(closes, int(p["period"]), p["k"])
-    return [1 if i and closes[i - 1] < lo[i - 1] and closes[i] >= lo[i]
-            else -1 if i and closes[i - 1] > up[i - 1] and closes[i] <= up[i] else 0
-            for i in range(len(c))]  # fmt: skip
+    return [
+        1
+        if i and closes[i - 1] < lo[i - 1] and closes[i] >= lo[i]
+        else -1
+        if i and closes[i - 1] > up[i - 1] and closes[i] <= up[i]
+        else 0
+        for i in range(len(c))
+    ]
 
 
 def macd_momentum(c: list[Candle], p: Params) -> list[int]:
@@ -131,22 +141,43 @@ def volume_breakout(c: list[Candle], p: Params) -> list[int]:
 
 
 STRATEGIES: dict[str, tuple[Signals, dict[str, tuple[float, float, bool]], str]] = {
-    "ema_cross": (ema_cross, {"fast": (5, 12, True), "slow": (15, 40, True)},
-                  "Fast EMA crosses slow EMA in the direction of the 50 EMA trend"),
-    "rsi_reversion": (rsi_reversion, {"period": (7, 21, True), "low": (20, 35, False)},
-                      "Buy when RSI climbs back out of oversold, short out of overbought"),
-    "vwap_trend": (vwap_trend, {"ema": (9, 30, True)},
-                   "Price crosses VWAP with the EMA sloping the same way"),
+    "ema_cross": (
+        ema_cross,
+        {"fast": (5, 12, True), "slow": (15, 40, True)},
+        "Fast EMA crosses slow EMA in the direction of the 50 EMA trend",
+    ),
+    "rsi_reversion": (
+        rsi_reversion,
+        {"period": (7, 21, True), "low": (20, 35, False)},
+        "Buy when RSI climbs back out of oversold, short out of overbought",
+    ),
+    "vwap_trend": (
+        vwap_trend,
+        {"ema": (9, 30, True)},
+        "Price crosses VWAP with the EMA sloping the same way",
+    ),
     "orb": (orb, {"bars": (2, 6, True)}, "Opening-range breakout of the first candles of the day"),
-    "bollinger_reversion": (bollinger_reversion, {"period": (14, 30, True), "k": (1.6, 2.6, False)},
-                            "Re-entry into the Bollinger band after closing outside it"),
-    "macd_momentum": (macd_momentum, {"min_gap": (0, 1, False)},
-                      "MACD crosses its signal line on the same side of zero"),
-    "engulfing_trend": (engulfing_trend, {"trend": (20, 60, True)},
-                        "Engulfing candle in the direction of the trend"),
-    "volume_breakout": (volume_breakout, {"lookback": (10, 30, True), "vol_mult": (1.3, 3.0, False)},
-                        "Range breakout on unusually high volume"),
-}  # fmt: skip
+    "bollinger_reversion": (
+        bollinger_reversion,
+        {"period": (14, 30, True), "k": (1.6, 2.6, False)},
+        "Re-entry into the Bollinger band after closing outside it",
+    ),
+    "macd_momentum": (
+        macd_momentum,
+        {"min_gap": (0, 1, False)},
+        "MACD crosses its signal line on the same side of zero",
+    ),
+    "engulfing_trend": (
+        engulfing_trend,
+        {"trend": (20, 60, True)},
+        "Engulfing candle in the direction of the trend",
+    ),
+    "volume_breakout": (
+        volume_breakout,
+        {"lookback": (10, 30, True), "vol_mult": (1.3, 3.0, False)},
+        "Range breakout on unusually high volume",
+    ),
+}
 
 
 def space(name: str) -> dict[str, tuple[float, float, bool]]:
@@ -156,7 +187,9 @@ def space(name: str) -> dict[str, tuple[float, float, bool]]:
 def random_params(name: str, rng: random.Random) -> Params:
     out: Params = {}
     for key, (lo, hi, integer) in space(name).items():
-        out[key] = float(rng.randint(int(lo), int(hi))) if integer else round(rng.uniform(lo, hi), 2)
+        out[key] = (
+            float(rng.randint(int(lo), int(hi))) if integer else round(rng.uniform(lo, hi), 2)
+        )
     return out
 
 

@@ -22,6 +22,7 @@ export const NAV: NavItem[] = [
   { path: "/customers", label: "Customers", description: "Customer records" },
   { path: "/products", label: "Products", description: "AI SaaS factory" },
   { path: "/revenue", label: "Revenue", description: "Revenue portfolio" },
+  { path: "/trading", label: "Trading", description: "300-bot trading desk and demat account" },
   { path: "/experiments", label: "Experiments", description: "Business experiments" },
   { path: "/memory", label: "Memory", description: "Knowledge and memory" },
   { path: "/audit-log", label: "Audit Log", description: "Traceable record of every change" },

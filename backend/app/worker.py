@@ -16,10 +16,12 @@ from app.db.base import utcnow
 from app.llm.router import ModelRouter
 from app.models import Knowledge, Task
 from app.services import autopilot, model_scout, tasks
+from app.trading import service as trading
 
 log = logging.getLogger(__name__)
 HOUSEKEEPING_EVERY = timedelta(minutes=10)
 AUTOPILOT_EVERY = timedelta(seconds=15)
+TRADING_EVERY = 30.0  # seconds between trading-swarm heartbeats
 
 
 class Worker:
@@ -28,7 +30,11 @@ class Worker:
     ) -> None:
         self.factory, self.router, self.poll = factory, router, poll
         self._stop = threading.Event()
-        self._threads = [threading.Thread(target=self._run, name="matt-worker", daemon=True)]
+        self._threads = [
+            threading.Thread(target=self._run, name="matt-worker", daemon=True),
+            # Its own thread: market-data calls must never hold up the task queue.
+            threading.Thread(target=self._trade, name="matt-trading", daemon=True),
+        ]
         with factory() as db:  # SKIP LOCKED makes parallel claiming safe; SQLite has none
             parallel = db.get_bind().dialect.name == "postgresql"
         for i in range(1, threads if parallel else 1):
@@ -63,6 +69,16 @@ class Worker:
                 worked = False
             if not worked:
                 self._stop.wait(self.poll)
+
+    def _trade(self) -> None:
+        """The trading swarm's heartbeat: guard open positions, give bots their turns."""
+        while not self._stop.is_set():
+            try:
+                with self.factory() as db:
+                    trading.tick(db, self.router)
+            except Exception:
+                log.exception("trading loop error")
+            self._stop.wait(TRADING_EVERY)
 
     def _run(self) -> None:
         last_housekeeping = utcnow() - HOUSEKEEPING_EVERY

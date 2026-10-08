@@ -8,8 +8,8 @@ import re
 import xml.etree.ElementTree as ET
 from collections.abc import Callable
 from dataclasses import dataclass
-from email.utils import parsedate_to_datetime
 from datetime import datetime
+from email.utils import parsedate_to_datetime
 from urllib.parse import quote_plus
 
 import httpx
@@ -17,19 +17,80 @@ import httpx
 from app.trading.universe import Instrument
 
 RSS = "https://news.google.com/rss/search?q={q}&hl=en-IN&gl=IN&ceid=IN:en"
-CRYPTO_NAMES = {"BTC": "Bitcoin", "ETH": "Ethereum", "SOL": "Solana", "BNB": "BNB", "XRP": "XRP",
-                "DOGE": "Dogecoin", "ADA": "Cardano", "TRX": "Tron", "AVAX": "Avalanche",
-                "LINK": "Chainlink"}  # fmt: skip
+CRYPTO_NAMES = {
+    "BTC": "Bitcoin",
+    "ETH": "Ethereum",
+    "SOL": "Solana",
+    "BNB": "BNB",
+    "XRP": "XRP",
+    "DOGE": "Dogecoin",
+    "ADA": "Cardano",
+    "TRX": "Tron",
+    "AVAX": "Avalanche",
+    "LINK": "Chainlink",
+}
 POSITIVE = {
-    "surge", "surges", "soar", "soars", "jump", "jumps", "rally", "rallies", "gain", "gains",
-    "beat", "beats", "record", "upgrade", "upgraded", "buy", "bullish", "profit", "growth",
-    "rise", "rises", "high", "strong", "order", "wins", "approval", "outperform", "dividend",
-}  # fmt: skip
+    "surge",
+    "surges",
+    "soar",
+    "soars",
+    "jump",
+    "jumps",
+    "rally",
+    "rallies",
+    "gain",
+    "gains",
+    "beat",
+    "beats",
+    "record",
+    "upgrade",
+    "upgraded",
+    "buy",
+    "bullish",
+    "profit",
+    "growth",
+    "rise",
+    "rises",
+    "high",
+    "strong",
+    "order",
+    "wins",
+    "approval",
+    "outperform",
+    "dividend",
+}
 NEGATIVE = {
-    "fall", "falls", "drop", "drops", "plunge", "plunges", "slump", "crash", "loss", "losses",
-    "miss", "misses", "downgrade", "downgraded", "sell", "bearish", "weak", "probe", "fraud",
-    "ban", "penalty", "default", "lawsuit", "hack", "hacked", "low", "decline", "cut", "raid",
-}  # fmt: skip
+    "fall",
+    "falls",
+    "drop",
+    "drops",
+    "plunge",
+    "plunges",
+    "slump",
+    "crash",
+    "loss",
+    "losses",
+    "miss",
+    "misses",
+    "downgrade",
+    "downgraded",
+    "sell",
+    "bearish",
+    "weak",
+    "probe",
+    "fraud",
+    "ban",
+    "penalty",
+    "default",
+    "lawsuit",
+    "hack",
+    "hacked",
+    "low",
+    "decline",
+    "cut",
+    "raid",
+}
+MAX_XML = 1_000_000
 WORD = re.compile(r"[a-z]+")
 
 
@@ -56,7 +117,8 @@ def query(inst: Instrument) -> str:
 
 def parse(xml: str, limit: int = 8) -> list[Headline]:
     try:
-        root = ET.fromstring(xml)
+        # Python 3.13's bundled expat caps entity expansion and never fetches external entities.
+        root = ET.fromstring(xml[:MAX_XML])  # noqa: S314
     except ET.ParseError:
         return []
     out: list[Headline] = []
@@ -68,8 +130,9 @@ def parse(xml: str, limit: int = 8) -> list[Headline]:
             published = parsedate_to_datetime(item.findtext("pubDate") or "")
         except (TypeError, ValueError):
             published = None
-        out.append(Headline(title[:500], (item.findtext("link") or "")[:1000], published,
-                            score(title)))  # fmt: skip
+        out.append(
+            Headline(title[:500], (item.findtext("link") or "")[:1000], published, score(title))
+        )
         if len(out) >= limit:
             break
     return out
@@ -78,8 +141,13 @@ def parse(xml: str, limit: int = 8) -> list[Headline]:
 def fetch(inst: Instrument, get: Callable[[str], str] | None = None) -> list[Headline]:
     url = RSS.format(q=quote_plus(query(inst)))
     try:
-        text = get(url) if get else httpx.get(url, timeout=10, headers={
-            "User-Agent": "Mozilla/5.0 (compatible; MATT/0.1)"}).text  # fmt: skip
+        text = (
+            get(url)
+            if get
+            else httpx.get(
+                url, timeout=10, headers={"User-Agent": "Mozilla/5.0 (compatible; MATT/0.1)"}
+            ).text
+        )
     except Exception:
         return []
     return parse(text)

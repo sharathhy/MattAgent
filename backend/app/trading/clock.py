@@ -12,8 +12,11 @@ from zoneinfo import ZoneInfo
 
 IST = ZoneInfo("Asia/Kolkata")
 NSE_OPEN, NSE_ENTRY_FROM, NSE_ENTRY_UNTIL, NSE_SQUARE_OFF = (
-    time(9, 15), time(9, 20), time(14, 45), time(15, 10),
-)  # fmt: skip
+    time(9, 15),
+    time(9, 20),
+    time(14, 45),
+    time(15, 10),
+)
 CRYPTO_ENTRY_UNTIL, CRYPTO_SQUARE_OFF = time(23, 0), time(23, 30)
 
 

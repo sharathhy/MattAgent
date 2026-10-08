@@ -20,7 +20,9 @@ log = logging.getLogger(__name__)
 Candle = list[float]
 
 YAHOO = "https://query1.finance.yahoo.com/v8/finance/chart/{feed}?interval={interval}&range={rng}"
-BINANCE = "https://data-api.binance.vision/api/v3/klines?symbol={feed}&interval={interval}&limit=300"
+BINANCE = (
+    "https://data-api.binance.vision/api/v3/klines?symbol={feed}&interval={interval}&limit=300"
+)
 HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; MATT/0.1)", "Accept": "application/json"}
 YAHOO_RANGE = {"5m": "5d", "15m": "1mo"}
 
@@ -38,7 +40,9 @@ def parse_yahoo(data: dict[str, Any]) -> list[Candle]:
     q = ((r.get("indicators") or {}).get("quote") or [{}])[0]
     out: list[Candle] = []
     for i, ts in enumerate(stamps):
-        row = [q.get(k, [None] * len(stamps))[i] for k in ("open", "high", "low", "close", "volume")]
+        row = [
+            q.get(k, [None] * len(stamps))[i] for k in ("open", "high", "low", "close", "volume")
+        ]
         if any(v is None for v in row[:4]):
             continue  # Yahoo leaves gaps as nulls
         out.append([float(ts), *(float(v or 0) for v in row)])

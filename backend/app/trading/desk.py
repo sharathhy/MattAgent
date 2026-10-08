@@ -35,12 +35,23 @@ def account(db: Session) -> TradingAccount:
     row = db.scalar(select(TradingAccount).limit(1))
     if row is None:
         row = TradingAccount(
-            mode="paper", enabled=True, kill_switch=False, starting_capital=PAPER_CAPITAL,
-            cash=PAPER_CAPITAL, realized_pnl=Decimal("0"), fees_paid=Decimal("0"),
-            peak_equity=PAPER_CAPITAL, day_start_equity=PAPER_CAPITAL, goal_inr=GOAL_INR,
-            max_trade_risk_pct=2.0, max_day_loss_pct=HARD_MAX_PCT, max_open_positions=3,
-            live_capital_cap_inr=Decimal("0"), bot_cursor=0, equity_curve=[],
-        )  # fmt: skip
+            mode="paper",
+            enabled=True,
+            kill_switch=False,
+            starting_capital=PAPER_CAPITAL,
+            cash=PAPER_CAPITAL,
+            realized_pnl=Decimal("0"),
+            fees_paid=Decimal("0"),
+            peak_equity=PAPER_CAPITAL,
+            day_start_equity=PAPER_CAPITAL,
+            goal_inr=GOAL_INR,
+            max_trade_risk_pct=2.0,
+            max_day_loss_pct=HARD_MAX_PCT,
+            max_open_positions=3,
+            live_capital_cap_inr=Decimal("0"),
+            bot_cursor=0,
+            equity_curve=[],
+        )
         db.add(row)
         db.commit()
     return row
@@ -110,7 +121,9 @@ class Order:
     strategist: TradingBot | None
 
 
-def size(acct: TradingAccount, eq: Decimal, order: Order, open_count: int) -> tuple[Decimal, float, float]:
+def size(
+    acct: TradingAccount, eq: Decimal, order: Order, open_count: int
+) -> tuple[Decimal, float, float]:
     """(quantity, stop, target). Quantity is 0 when the trade can't be sized within the limits."""
     stop, target = backtest.levels(order.side, order.price, order.atr, order.params)
     dist = Decimal(str(abs(order.price - stop)))
@@ -140,7 +153,9 @@ def open_trade(
     if order.side < 0 and order.inst.market == "crypto":
         return None  # spot crypto can't be sold short
     current = open_trades(db, acct.mode)
-    if len(current) >= acct.max_open_positions or any(t.symbol == order.inst.symbol for t in current):
+    if len(current) >= acct.max_open_positions or any(
+        t.symbol == order.inst.symbol for t in current
+    ):
         return None
     eq = equity(db, acct)
     qty, stop, target = size(acct, eq, order, len(current))
@@ -154,38 +169,80 @@ def open_trade(
             orders = broker.enter(order.inst.symbol, side, int(qty), stop)
         except BrokerError as exc:
             events.emit(db, "trading.order_rejected", symbol=order.inst.symbol, error=str(exc))
-            audit.record(db, actor_type="system", actor_id=ACTOR, action="trading.order_rejected",
-                         target_type="symbol", target_id=order.inst.symbol,
-                         details={"side": side, "qty": str(qty), "error": str(exc)})  # fmt: skip
+            audit.record(
+                db,
+                actor_type="system",
+                actor_id=ACTOR,
+                action="trading.order_rejected",
+                target_type="symbol",
+                target_id=order.inst.symbol,
+                details={"side": side, "qty": str(qty), "error": str(exc)},
+            )
             db.commit()
             return None
         entry = Decimal(str(orders.get("fill_price") or entry))
     trade = TradingTrade(
-        mode=acct.mode, symbol=order.inst.symbol, market=order.inst.market, side=side, qty=qty,
-        entry_price=entry, stop_price=Decimal(str(round(stop, 4))),
-        target_price=Decimal(str(round(target, 4))), last_price=entry, status="open",
+        mode=acct.mode,
+        symbol=order.inst.symbol,
+        market=order.inst.market,
+        side=side,
+        qty=qty,
+        entry_price=entry,
+        stop_price=Decimal(str(round(stop, 4))),
+        target_price=Decimal(str(round(target, 4))),
+        last_price=entry,
+        status="open",
         trader_bot_id=order.trader.id if order.trader else None,
         strategist_bot_id=order.strategist.id if order.strategist else None,
-        strategy=order.strategy, features=order.features, broker_orders=orders, opened_at=now,
-        pnl=Decimal("0"), fees=Decimal("0"),
-    )  # fmt: skip
+        strategy=order.strategy,
+        features=order.features,
+        broker_orders=orders,
+        opened_at=now,
+        pnl=Decimal("0"),
+        fees=Decimal("0"),
+    )
     db.add(trade)
     acct.cash -= entry * qty
     db.flush()
-    audit.record(db, actor_type="system", actor_id=ACTOR, action=f"trading.{acct.mode}.open",
-                 target_type="trade", target_id=str(trade.id),
-                 details={"symbol": trade.symbol, "side": side, "qty": str(qty),
-                          "entry": str(entry), "stop": str(trade.stop_price),
-                          "target": str(trade.target_price), "orders": orders})  # fmt: skip
-    events.emit(db, "trading.opened", trade_id=trade.id, symbol=trade.symbol, side=side,
-                qty=str(qty), price=str(entry), mode=acct.mode)  # fmt: skip
+    audit.record(
+        db,
+        actor_type="system",
+        actor_id=ACTOR,
+        action=f"trading.{acct.mode}.open",
+        target_type="trade",
+        target_id=str(trade.id),
+        details={
+            "symbol": trade.symbol,
+            "side": side,
+            "qty": str(qty),
+            "entry": str(entry),
+            "stop": str(trade.stop_price),
+            "target": str(trade.target_price),
+            "orders": orders,
+        },
+    )
+    events.emit(
+        db,
+        "trading.opened",
+        trade_id=trade.id,
+        symbol=trade.symbol,
+        side=side,
+        qty=str(qty),
+        price=str(entry),
+        mode=acct.mode,
+    )
     return trade
 
 
 def close_trade(
-    db: Session, acct: TradingAccount, broker: Broker, trade: TradingTrade, price: float,
-    reason: str, now: datetime,
-) -> TradingTrade:  # fmt: skip
+    db: Session,
+    acct: TradingAccount,
+    broker: Broker,
+    trade: TradingTrade,
+    price: float,
+    reason: str,
+    now: datetime,
+) -> TradingTrade:
     exit_price = Decimal(str(round(price, 4)))
     if trade.mode == "live" and not broker.live:
         # No broker session today: MATT can't close a real position, so it doesn't pretend to.
@@ -200,9 +257,15 @@ def close_trade(
         except BrokerError as exc:
             # Leave it open and say so loudly; the broker's own stop order still protects it.
             events.emit(db, "trading.exit_failed", trade_id=trade.id, error=str(exc))
-            audit.record(db, actor_type="system", actor_id=ACTOR, action="trading.exit_failed",
-                         target_type="trade", target_id=str(trade.id),
-                         details={"error": str(exc)})  # fmt: skip
+            audit.record(
+                db,
+                actor_type="system",
+                actor_id=ACTOR,
+                action="trading.exit_failed",
+                target_type="trade",
+                target_id=str(trade.id),
+                details={"error": str(exc)},
+            )
             return trade
     direction = 1 if trade.side == "long" else -1
     gross = (exit_price - trade.entry_price) * trade.qty * direction
@@ -222,12 +285,30 @@ def close_trade(
             bot.wins += trade.pnl > 0
             bot.losses += trade.pnl <= 0
             bot.pnl += trade.pnl
-    audit.record(db, actor_type="system", actor_id=ACTOR, action=f"trading.{trade.mode}.close",
-                 target_type="trade", target_id=str(trade.id),
-                 details={"symbol": trade.symbol, "exit": str(exit_price), "reason": reason,
-                          "pnl": str(trade.pnl), "fees": str(fees)})  # fmt: skip
-    events.emit(db, "trading.closed", trade_id=trade.id, symbol=trade.symbol, reason=reason,
-                pnl=str(trade.pnl), mode=trade.mode)  # fmt: skip
+    audit.record(
+        db,
+        actor_type="system",
+        actor_id=ACTOR,
+        action=f"trading.{trade.mode}.close",
+        target_type="trade",
+        target_id=str(trade.id),
+        details={
+            "symbol": trade.symbol,
+            "exit": str(exit_price),
+            "reason": reason,
+            "pnl": str(trade.pnl),
+            "fees": str(fees),
+        },
+    )
+    events.emit(
+        db,
+        "trading.closed",
+        trade_id=trade.id,
+        symbol=trade.symbol,
+        reason=reason,
+        pnl=str(trade.pnl),
+        mode=trade.mode,
+    )
     return trade
 
 

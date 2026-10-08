@@ -1,5 +1,6 @@
 """Technical indicators and candlestick patterns, in plain Python (no paid data or libraries)."""
 
+import itertools
 from typing import Any
 
 from app.trading.market import Candle
@@ -19,11 +20,13 @@ def rsi(closes: list[float], period: int = 14) -> list[float]:
     if len(closes) < 2:
         return [50.0] * len(closes)
     gains, losses = [0.0], [0.0]
-    for a, b in zip(closes, closes[1:], strict=False):
+    for a, b in itertools.pairwise(closes):
         gains.append(max(b - a, 0.0))
         losses.append(max(a - b, 0.0))
     avg_g, avg_l = ema(gains, period * 2 - 1), ema(losses, period * 2 - 1)  # Wilder smoothing
-    return [100.0 if lo == 0 else 100 - 100 / (1 + g / lo) for g, lo in zip(avg_g, avg_l, strict=True)]
+    return [
+        100.0 if lo == 0 else 100 - 100 / (1 + g / lo) for g, lo in zip(avg_g, avg_l, strict=True)
+    ]
 
 
 def atr(candles: list[Candle], period: int = 14) -> list[float]:
@@ -50,7 +53,9 @@ def vwap(candles: list[Candle]) -> list[float]:
     return out
 
 
-def bollinger(closes: list[float], period: int = 20, k: float = 2.0) -> tuple[list[float], list[float]]:
+def bollinger(
+    closes: list[float], period: int = 20, k: float = 2.0
+) -> tuple[list[float], list[float]]:
     upper, lower = [], []
     for i in range(len(closes)):
         w = closes[max(0, i - period + 1) : i + 1]
@@ -100,9 +105,16 @@ def summary(candles: list[Candle]) -> dict[str, Any]:
     price = closes[-1]
     return {
         "price": price,
-        "ema9": e9[-1], "ema21": e21[-1], "ema50": e50[-1],
-        "rsi": rsi(closes)[-1], "atr": a[-1], "atr_pct": a[-1] / price * 100 if price else 0,
-        "vwap": vwap(candles)[-1], "macd": m[-1], "macd_signal": sig[-1],
-        "bb_upper": up[-1], "bb_lower": lo[-1],
+        "ema9": e9[-1],
+        "ema21": e21[-1],
+        "ema50": e50[-1],
+        "rsi": rsi(closes)[-1],
+        "atr": a[-1],
+        "atr_pct": a[-1] / price * 100 if price else 0,
+        "vwap": vwap(candles)[-1],
+        "macd": m[-1],
+        "macd_signal": sig[-1],
+        "bb_upper": up[-1],
+        "bb_lower": lo[-1],
         "trend": "up" if e21[-1] > e50[-1] else "down",
-    }  # fmt: skip
+    }

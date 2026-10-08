@@ -13,6 +13,7 @@ import { CustomersPage, ExperimentsPage, MemoryPage, ProductsPage, RevenuePage }
 import { SettingsPage } from "./pages/SettingsPage";
 import { TasksPage } from "./pages/TasksPage";
 import { ToolsPage } from "./pages/ToolsPage";
+import { TradingPage } from "./pages/TradingPage";
 import { WorkflowsPage } from "./pages/WorkflowsPage";
 import { AgentsPage } from "./pages/AgentsPage";
 import { AuditLogPage } from "./pages/AuditLogPage";
@@ -49,6 +50,7 @@ export function App() {
         <Route path="/customers" element={<CustomersPage />} />
         <Route path="/products" element={<ProductsPage />} />
         <Route path="/revenue" element={<RevenuePage />} />
+        <Route path="/trading" element={<TradingPage />} />
         <Route path="/experiments" element={<ExperimentsPage />} />
         <Route path="/memory" element={<MemoryPage />} />
         <Route path="/settings" element={<SettingsPage />} />

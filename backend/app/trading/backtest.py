@@ -40,10 +40,16 @@ class Result:
         return round((self.return_pct - 0.5 * self.max_drawdown_pct) * confidence, 4)
 
     def as_dict(self) -> dict[str, Any]:
-        return {"trades": self.trades, "wins": self.wins, "losses": self.losses,
-                "win_rate": round(self.win_rate, 3), "return_pct": round(self.return_pct, 3),
-                "expectancy_pct": round(self.expectancy_pct, 4),
-                "max_drawdown_pct": round(self.max_drawdown_pct, 3), "fitness": self.fitness}  # fmt: skip
+        return {
+            "trades": self.trades,
+            "wins": self.wins,
+            "losses": self.losses,
+            "win_rate": round(self.win_rate, 3),
+            "return_pct": round(self.return_pct, 3),
+            "expectancy_pct": round(self.expectancy_pct, 4),
+            "max_drawdown_pct": round(self.max_drawdown_pct, 3),
+            "fitness": self.fitness,
+        }
 
 
 def levels(side: int, entry: float, atr: float, params: dict[str, float]) -> tuple[float, float]:
@@ -52,9 +58,14 @@ def levels(side: int, entry: float, atr: float, params: dict[str, float]) -> tup
 
 
 def run(
-    name: str, candles: list[Candle], params: dict[str, float], *, cost_pct: float,
-    allow_short: bool = True, avoid: list[str] | None = None,
-) -> Result:  # fmt: skip
+    name: str,
+    candles: list[Candle],
+    params: dict[str, float],
+    *,
+    cost_pct: float,
+    allow_short: bool = True,
+    avoid: list[str] | None = None,
+) -> Result:
     res = Result()
     if len(candles) < 30:
         return res
@@ -94,7 +105,9 @@ def run(
         peak = max(peak, equity)
         res.max_drawdown_pct = max(res.max_drawdown_pct, peak - equity)
         if len(res.log) < 50:
-            res.log.append({"at": candles[i + 1][0], "side": s, "ret": round(ret, 3), "exit": reason})
+            res.log.append(
+                {"at": candles[i + 1][0], "side": s, "ret": round(ret, 3), "exit": reason}
+            )
         i = max(j, i + 1) + 1
     return res
 
@@ -104,16 +117,22 @@ def feature_series(candles: list[Candle]) -> list[dict[str, Any]]:
     closes = [c[4] for c in candles]
     e21, e50, r, a = ind.ema(closes, 21), ind.ema(closes, 50), ind.rsi(closes), ind.atr(candles)
     return [
-        {"trend": "up" if e21[i] > e50[i] else "down",
-         "rsi": "high" if r[i] > 65 else "low" if r[i] < 35 else "mid",
-         "vol": "high" if closes[i] and a[i] / closes[i] > 0.006 else "low"}
+        {
+            "trend": "up" if e21[i] > e50[i] else "down",
+            "rsi": "high" if r[i] > 65 else "low" if r[i] < 35 else "mid",
+            "vol": "high" if closes[i] and a[i] / closes[i] > 0.006 else "low",
+        }
         for i in range(len(candles))
-    ]  # fmt: skip
+    ]
 
 
 def bucket(side: int, features: dict[str, Any]) -> str:
     """A coarse market-condition label, e.g. ``long|down|high|mid``."""
-    return "|".join([
-        "long" if side > 0 else "short", str(features.get("trend")), str(features.get("vol")),
-        str(features.get("rsi")),
-    ])  # fmt: skip
+    return "|".join(
+        [
+            "long" if side > 0 else "short",
+            str(features.get("trend")),
+            str(features.get("vol")),
+            str(features.get("rsi")),
+        ]
+    )

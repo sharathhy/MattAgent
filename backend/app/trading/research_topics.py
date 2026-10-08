@@ -1,0 +1,36 @@
+# ruff: noqa: E501
+"""What the 30 research bots study, with MATT's built-in notes for when no free AI model is
+connected. The notes are general, well-established intraday practice, not trading advice."""
+
+RESEARCH_TOPICS: dict[str, str] = {
+    "VWAP as an intraday bias": "Price above VWAP favours longs, below favours shorts; institutions benchmark fills to VWAP, so first touches often act as support or resistance.",
+    "Opening range breakout": "The first 15-30 minutes set a range; breakouts with volume tend to follow through, but false breaks are common on low-volume days.",
+    "Position sizing and the 1-2% rule": "Size every trade so the stop costs a fixed small slice of capital; this, not win rate, is what keeps an account alive.",
+    "Stop-loss placement with ATR": "Stops of 1-2x ATR sit outside normal noise; tighter stops get hit by random movement more often than they save.",
+    "Risk-reward and expectancy": "Expectancy = win rate x average win - loss rate x average loss. A 40% win rate with 2:1 reward is profitable; a 90% win rate with tiny wins and big losses is not.",
+    "Candlestick reversal patterns": "Hammers, engulfing candles and dojis matter mostly at support/resistance and in the direction of the higher-timeframe trend; alone they are weak.",
+    "Trend filters with EMAs": "Trading only in the direction of the 50-period EMA removes many losing counter-trend trades.",
+    "RSI in trending vs ranging markets": "RSI oversold buys work in ranges and fail in strong downtrends, where RSI can stay low for long.",
+    "Volume confirmation": "Breakouts on above-average volume are more reliable; breakouts on thin volume often reverse.",
+    "NSE market timings and square-off": "NSE cash trades 09:15-15:30 IST; brokers auto-square MIS positions around 15:20 with a fee, so exit earlier.",
+    "Intraday costs in India": "STT, exchange fees, GST and stamp duty make very small, frequent trades unprofitable; each trade must move more than costs.",
+    "Avoiding the first five minutes": "The open is volatile with wide spreads; many intraday traders wait for the first candles to settle.",
+    "News-driven moves": "Results, block deals and regulatory news cause gaps; trading against fresh news is risky.",
+    "Bollinger Band squeeze": "Low band width often precedes a volatility expansion; direction is unknown until the break.",
+    "MACD momentum": "MACD crosses on the same side of zero confirm momentum; crosses near zero in ranges whipsaw.",
+    "Overtrading and revenge trading": "Losses invite bigger, worse trades; a daily loss limit stops the spiral.",
+    "Liquidity and slippage": "Thinly traded stocks fill worse than the chart shows; prefer liquid names.",
+    "Crypto intraday sessions": "Crypto trades 24/7 with volume peaks when US and Europe overlap; weekends are thinner.",
+    "Bitcoin dominance and altcoins": "Altcoins usually follow Bitcoin's direction with larger swings.",
+    "Support and resistance levels": "Previous day high/low and round numbers attract orders and reactions.",
+    "Gap-up and gap-down days": "Large gaps often partly fill intraday; chasing a gap at the open is risky.",
+    "Backtesting pitfalls": "Overfitting to recent candles, ignoring costs and look-ahead bias make backtests look better than live results.",
+    "Market regime detection": "Strategies that work in trends fail in ranges and vice versa; measure the regime first.",
+    "Pre-market and global cues": "SGX/GIFT Nifty, US futures and crude oil set the opening tone for Indian markets.",
+    "Sector rotation intraday": "Money moves between sectors through the day; leaders often keep leading.",
+    "Short selling intraday in India": "Cash-market shorts must be closed the same day; you cannot carry them overnight.",
+    "Trailing stops": "Moving the stop behind price locks in gains but can cut winners early in choppy markets.",
+    "Psychology and discipline": "Following the plan matters more than any single signal; record every trade.",
+    "Indian crypto taxation": "India taxes crypto gains at 30% and withholds 1% TDS on sales; losses can't offset other income.",
+    "Why 90% win rates are a red flag": "Very high win rates usually mean small targets and large stops; a few losses erase many wins.",
+}  # fmt: skip

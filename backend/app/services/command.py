@@ -41,6 +41,15 @@ AUDIT = re.compile(
 STATUS = re.compile(r"\b(status|what'?s (?:happening|going on)|update me|brief me|report)\b", re.I)
 WAKE_PREFIX = re.compile(r"^\W*(?:(?:hey|hi|hello|ok|okay)\W+)?matt\b\W*", re.I)
 WAKE_REPLY = "I'm listening. What needs to be done?"
+#: "Stop trading" is the owner's spoken kill switch for the trading bots.
+TRADING_STOP = re.compile(
+    r"\b(?:stop|halt|kill|pause|freeze)\b.{0,20}\b(?:trading|trades)\b|\bkill switch\b", re.I
+)
+TRADING_STATUS = re.compile(
+    r"\b(?:trading|trades|p\s*&\s*l|pnl|demat|portfolio)\b.{0,30}\b(?:status|doing|update|today)\b"
+    r"|\bhow(?:'s| is| are)\b.{0,20}\b(?:trading|trades)\b",
+    re.I,
+)
 
 
 @dataclass
@@ -84,6 +93,21 @@ def handle(db: Session, router: ModelRouter, user: User, text: str) -> CommandRe
     db.commit()
     if not text or WAKE.match(text):
         return CommandResult(WAKE_REPLY, "wake")
+
+    if TRADING_STOP.search(text):
+        from app.trading import service as trading
+
+        acct = trading.kill(db, user, router)
+        return CommandResult(
+            "Trading stopped. The kill switch is on, every open position was squared off, and no "
+            f"bot will open a trade until you press Resume on the Trading page ({acct.mode} mode).",
+            "trading_stop",
+        )
+
+    if TRADING_STATUS.search(text) and len(text) < 100:
+        from app.trading import service as trading
+
+        return CommandResult(trading.spoken_status(db), "trading_status")
 
     if quick := assistant.answer(db, user, text, router.settings.timezone):
         return CommandResult(quick.reply, quick.intent, None, quick.data)

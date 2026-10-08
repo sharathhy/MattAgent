@@ -40,9 +40,15 @@ ZERODHA_NEEDS = [
 
 
 def _audit(db: Session, user: User, action: str, **details: Any) -> None:
-    audit.record(db, actor_type="user", actor_id=str(user.id), action=f"trading.{action}",
-                 target_type="trading_account", target_id="1",
-                 details={k: str(v) for k, v in details.items()})  # fmt: skip
+    audit.record(
+        db,
+        actor_type="user",
+        actor_id=str(user.id),
+        action=f"trading.{action}",
+        target_type="trading_account",
+        target_id="1",
+        details={k: str(v) for k, v in details.items()},
+    )
     events.emit(db, f"trading.{action}", by=str(user.id))
 
 
@@ -64,8 +70,9 @@ def broker_for(db: Session, settings: Settings, acct: TradingAccount, now: datet
     return KiteBroker(KiteClient(api_key, token))
 
 
-def tick(db: Session, router: ModelRouter, *, feed: Feed | None = None,
-         now: datetime | None = None) -> dict[str, int]:  # fmt: skip
+def tick(
+    db: Session, router: ModelRouter, *, feed: Feed | None = None, now: datetime | None = None
+) -> dict[str, int]:
     now = now or datetime.now(UTC)
     settings = router.settings
     acct = desk.account(db)
@@ -81,39 +88,65 @@ def _trade(t: TradingTrade) -> dict[str, Any]:
     if t.status == "open" and t.last_price is not None:
         unreal = float((t.last_price - t.entry_price) * t.qty * (1 if t.side == "long" else -1))
     return {
-        "id": t.id, "mode": t.mode, "symbol": t.symbol, "market": t.market, "side": t.side,
-        "qty": float(t.qty), "entry_price": float(t.entry_price), "stop_price": float(t.stop_price),
-        "target_price": float(t.target_price), "last_price": float(t.last_price or t.entry_price),
+        "id": t.id,
+        "mode": t.mode,
+        "symbol": t.symbol,
+        "market": t.market,
+        "side": t.side,
+        "qty": float(t.qty),
+        "entry_price": float(t.entry_price),
+        "stop_price": float(t.stop_price),
+        "target_price": float(t.target_price),
+        "last_price": float(t.last_price or t.entry_price),
         "exit_price": float(t.exit_price) if t.exit_price is not None else None,
-        "status": t.status, "exit_reason": t.exit_reason, "pnl": float(t.pnl),
-        "fees": float(t.fees), "unrealized": unreal, "strategy": t.strategy,
-        "opened_at": t.opened_at, "closed_at": t.closed_at,
-    }  # fmt: skip
+        "status": t.status,
+        "exit_reason": t.exit_reason,
+        "pnl": float(t.pnl),
+        "fees": float(t.fees),
+        "unrealized": unreal,
+        "strategy": t.strategy,
+        "opened_at": t.opened_at,
+        "closed_at": t.closed_at,
+    }
 
 
 def _bot(b: TradingBot) -> dict[str, Any]:
     return {
-        "slug": b.slug, "name": b.name, "role": b.role, "symbol": b.symbol,
-        "strategy": b.strategy, "generation": b.generation, "runs": b.runs, "trades": b.trades,
-        "wins": b.wins, "losses": b.losses, "pnl": float(b.pnl), "fitness": b.fitness,
-        "last_run_at": b.last_run_at, "last_note": b.last_note,
-        "avoid": b.memory.get("avoid", []), "backtest": b.memory.get("backtest"),
-    }  # fmt: skip
+        "slug": b.slug,
+        "name": b.name,
+        "role": b.role,
+        "symbol": b.symbol,
+        "strategy": b.strategy,
+        "generation": b.generation,
+        "runs": b.runs,
+        "trades": b.trades,
+        "wins": b.wins,
+        "losses": b.losses,
+        "pnl": float(b.pnl),
+        "fitness": b.fitness,
+        "last_run_at": b.last_run_at,
+        "last_note": b.last_note,
+        "avoid": b.memory.get("avoid", []),
+        "backtest": b.memory.get("backtest"),
+    }
 
 
 def stats(db: Session, mode: str) -> dict[str, Any]:
-    closed = db.scalars(select(TradingTrade).where(
-        TradingTrade.status == "closed", TradingTrade.mode == mode)).all()  # fmt: skip
+    closed = db.scalars(
+        select(TradingTrade).where(TradingTrade.status == "closed", TradingTrade.mode == mode)
+    ).all()
     wins = [float(t.pnl) for t in closed if t.pnl > 0]
     losses = [float(t.pnl) for t in closed if t.pnl <= 0]
     n = len(closed)
     return {
-        "trades": n, "wins": len(wins), "losses": len(losses),
+        "trades": n,
+        "wins": len(wins),
+        "losses": len(losses),
         "win_rate": round(len(wins) / n, 3) if n else None,
         "avg_win": round(sum(wins) / len(wins), 4) if wins else None,
         "avg_loss": round(sum(losses) / len(losses), 4) if losses else None,
         "expectancy": round((sum(wins) + sum(losses)) / n, 4) if n else None,
-    }  # fmt: skip
+    }
 
 
 def overview(db: Session, now: datetime | None = None) -> dict[str, Any]:
@@ -125,44 +158,85 @@ def overview(db: Session, now: datetime | None = None) -> dict[str, Any]:
     recent = now - timedelta(minutes=15)
     roles = []
     for role, total in swarm.ROLE_COUNTS.items():
-        active = db.scalar(select(func.count()).select_from(TradingBot).where(
-            TradingBot.role == role, TradingBot.last_run_at >= recent))  # fmt: skip
+        active = db.scalar(
+            select(func.count())
+            .select_from(TradingBot)
+            .where(TradingBot.role == role, TradingBot.last_run_at >= recent)
+        )
         roles.append({"role": role, "bots": total, "active_15m": int(active or 0)})
-    top = db.scalars(select(TradingBot).where(TradingBot.role == "strategist")
-                     .order_by(TradingBot.fitness.desc()).limit(10)).all()  # fmt: skip
-    traders = db.scalars(select(TradingBot).where(TradingBot.role == "trader",
-                                                  TradingBot.last_run_at.is_not(None))
-                         .order_by(TradingBot.last_run_at.desc()).limit(8)).all()  # fmt: skip
-    snaps = db.scalars(select(MarketSnapshot).where(MarketSnapshot.interval == "5m")
-                       .order_by(MarketSnapshot.symbol)).all()  # fmt: skip
+    top = db.scalars(
+        select(TradingBot)
+        .where(TradingBot.role == "strategist")
+        .order_by(TradingBot.fitness.desc())
+        .limit(10)
+    ).all()
+    traders = db.scalars(
+        select(TradingBot)
+        .where(TradingBot.role == "trader", TradingBot.last_run_at.is_not(None))
+        .order_by(TradingBot.last_run_at.desc())
+        .limit(8)
+    ).all()
+    snaps = db.scalars(
+        select(MarketSnapshot)
+        .where(MarketSnapshot.interval == "5m")
+        .order_by(MarketSnapshot.symbol)
+    ).all()
 
     def insights(kind: str, n: int) -> list[dict[str, Any]]:
-        rows = db.scalars(select(TradingInsight).where(TradingInsight.kind == kind)
-                          .order_by(TradingInsight.created_at.desc()).limit(n)).all()  # fmt: skip
-        return [{"id": r.id, "symbol": r.symbol, "title": r.title, "url": r.url,
-                 "sentiment": r.sentiment, "content": r.content, "created_at": r.created_at}
-                for r in rows]  # fmt: skip
+        rows = db.scalars(
+            select(TradingInsight)
+            .where(TradingInsight.kind == kind)
+            .order_by(TradingInsight.created_at.desc())
+            .limit(n)
+        ).all()
+        return [
+            {
+                "id": r.id,
+                "symbol": r.symbol,
+                "title": r.title,
+                "url": r.url,
+                "sentiment": r.sentiment,
+                "content": r.content,
+                "created_at": r.created_at,
+            }
+            for r in rows
+        ]
 
-    trades = db.scalars(select(TradingTrade).where(TradingTrade.status == "closed")
-                        .order_by(TradingTrade.id.desc()).limit(30)).all()  # fmt: skip
+    trades = db.scalars(
+        select(TradingTrade)
+        .where(TradingTrade.status == "closed")
+        .order_by(TradingTrade.id.desc())
+        .limit(30)
+    ).all()
     return {
         "account": {
-            "mode": acct.mode, "enabled": acct.enabled, "kill_switch": acct.kill_switch,
-            "halted_reason": acct.halted_reason, "blocked": desk.blocked(acct),
-            "starting_capital": float(acct.starting_capital), "cash": float(acct.cash),
-            "equity": float(eq), "realized_pnl": float(acct.realized_pnl),
+            "mode": acct.mode,
+            "enabled": acct.enabled,
+            "kill_switch": acct.kill_switch,
+            "halted_reason": acct.halted_reason,
+            "blocked": desk.blocked(acct),
+            "starting_capital": float(acct.starting_capital),
+            "cash": float(acct.cash),
+            "equity": float(eq),
+            "realized_pnl": float(acct.realized_pnl),
             "fees_paid": float(acct.fees_paid),
             "day_pnl": float(eq - acct.day_start_equity),
-            "total_return_pct": round(float((eq - acct.starting_capital) / acct.starting_capital * 100), 3)
-            if acct.starting_capital else 0.0,
-            "peak_equity": float(acct.peak_equity), "goal_inr": float(goal),
+            "total_return_pct": round(
+                float((eq - acct.starting_capital) / acct.starting_capital * 100), 3
+            )
+            if acct.starting_capital
+            else 0.0,
+            "peak_equity": float(acct.peak_equity),
+            "goal_inr": float(goal),
             "doublings_to_goal": round(math.log2(float(goal) / float(eq)), 1) if eq > 0 else None,
-            "max_trade_risk_pct": acct.max_trade_risk_pct, "max_day_loss_pct": acct.max_day_loss_pct,
+            "max_trade_risk_pct": acct.max_trade_risk_pct,
+            "max_day_loss_pct": acct.max_day_loss_pct,
             "max_open_positions": acct.max_open_positions,
             "live_capital_cap_inr": float(acct.live_capital_cap_inr),
-            "live_confirmed_at": acct.live_confirmed_at, "last_tick_at": acct.last_tick_at,
+            "live_confirmed_at": acct.live_confirmed_at,
+            "last_tick_at": acct.last_tick_at,
             "nse_open": clock.nse_open(now),
-        },  # fmt: skip
+        },
         "curve": acct.equity_curve or [],
         "positions": [_trade(t) for t in desk.open_trades(db)],
         "trades": [_trade(t) for t in trades],
@@ -170,10 +244,20 @@ def overview(db: Session, now: datetime | None = None) -> dict[str, Any]:
         "roles": roles,
         "top_strategists": [_bot(b) for b in top],
         "traders": [_bot(b) for b in traders],
-        "market": [{"symbol": s.symbol, "market": s.market, "price": float(s.price_inr),
-                    "change_pct": s.change_pct, "trend": s.indicators.get("trend"),
-                    "rsi": s.indicators.get("rsi"), "above_vwap": s.indicators.get("price", 0) > s.indicators.get("vwap", 0),
-                    "patterns": s.patterns, "updated_at": s.updated_at} for s in snaps],  # fmt: skip
+        "market": [
+            {
+                "symbol": s.symbol,
+                "market": s.market,
+                "price": float(s.price_inr),
+                "change_pct": s.change_pct,
+                "trend": s.indicators.get("trend"),
+                "rsi": s.indicators.get("rsi"),
+                "above_vwap": s.indicators.get("price", 0) > s.indicators.get("vwap", 0),
+                "patterns": s.patterns,
+                "updated_at": s.updated_at,
+            }
+            for s in snaps
+        ],
         "news": insights("news", 15),
         "research": insights("research", 10),
         "lessons": insights("lesson", 10),
@@ -181,6 +265,11 @@ def overview(db: Session, now: datetime | None = None) -> dict[str, Any]:
         "live_phrase": LIVE_PHRASE,
         "broker_needs": ZERODHA_NEEDS,
     }
+
+
+def account_view(db: Session) -> dict[str, Any]:
+    view: dict[str, Any] = overview(db)["account"]
+    return view
 
 
 def bots(db: Session, role: str | None) -> list[dict[str, Any]]:
@@ -193,8 +282,13 @@ def bots(db: Session, role: str | None) -> list[dict[str, Any]]:
 
 # --- Owner controls ------------------------------------------------------------------------
 
-EDITABLE = {"enabled", "max_trade_risk_pct", "max_day_loss_pct", "max_open_positions",
-            "live_capital_cap_inr"}  # fmt: skip
+EDITABLE = {
+    "enabled",
+    "max_trade_risk_pct",
+    "max_day_loss_pct",
+    "max_open_positions",
+    "live_capital_cap_inr",
+}
 
 
 def update(db: Session, user: User, changes: dict[str, Any]) -> TradingAccount:
@@ -212,7 +306,9 @@ def update(db: Session, user: User, changes: dict[str, Any]) -> TradingAccount:
     return acct
 
 
-def kill(db: Session, user: User, router: ModelRouter, now: datetime | None = None) -> TradingAccount:
+def kill(
+    db: Session, user: User, router: ModelRouter, now: datetime | None = None
+) -> TradingAccount:
     """Owner's stop switch: block new trades and square off everything now."""
     now = now or datetime.now(UTC)
     acct = desk.account(db)
@@ -255,8 +351,9 @@ def reset_paper(db: Session, user: User) -> TradingAccount:
     return acct
 
 
-def go_live(db: Session, user: User, confirm: str, capital_cap_inr: Decimal,
-            now: datetime | None = None) -> TradingAccount:  # fmt: skip
+def go_live(
+    db: Session, user: User, confirm: str, capital_cap_inr: Decimal, now: datetime | None = None
+) -> TradingAccount:
     """The owner switches real trading on. Needs the exact phrase, a connected broker with
     today's login, a capital cap, and no open paper positions."""
     now = now or datetime.now(UTC)
@@ -269,7 +366,9 @@ def go_live(db: Session, user: User, confirm: str, capital_cap_inr: Decimal,
     if capital_cap_inr <= 0:
         raise ServiceError("Set how much real money MATT may trade with")
     if row.funds_inr is not None and capital_cap_inr > row.funds_inr:
-        raise ServiceError(f"Your Zerodha account shows ₹{row.funds_inr} available; set a cap at or below it")
+        raise ServiceError(
+            f"Your Zerodha account shows ₹{row.funds_inr} available; set a cap at or below it"
+        )
     if desk.open_trades(db):
         raise ServiceError("Close open positions first (use Stop trading)")
     acct.mode, acct.live_capital_cap_inr = "live", capital_cap_inr
@@ -300,11 +399,15 @@ def broker_out(row: BrokerAccount, now: datetime | None = None) -> dict[str, Any
     now = now or datetime.now(UTC)
     logged_in = row.status == "connected" and row.token_day == clock.trading_day(now)
     return {
-        "id": row.id, "broker": row.broker, "label": row.label, "client_id": row.client_id,
+        "id": row.id,
+        "broker": row.broker,
+        "label": row.label,
+        "client_id": row.client_id,
         "status": "connected" if logged_in else "needs_login",
         "funds_inr": float(row.funds_inr) if row.funds_inr is not None else None,
-        "last_error": row.last_error, "updated_at": row.updated_at,
-    }  # fmt: skip
+        "last_error": row.last_error,
+        "updated_at": row.updated_at,
+    }
 
 
 def brokers(db: Session) -> list[BrokerAccount]:
@@ -316,16 +419,27 @@ def connected_broker(db: Session, now: datetime) -> BrokerAccount | None:
     return next((b for b in brokers(db) if b.status == "connected" and b.token_day == today), None)
 
 
-def add_broker(db: Session, settings: Settings, user: User, *, label: str, client_id: str,
-               api_key: str, api_secret: str) -> BrokerAccount:  # fmt: skip
+def add_broker(
+    db: Session,
+    settings: Settings,
+    user: User,
+    *,
+    label: str,
+    client_id: str,
+    api_key: str,
+    api_secret: str,
+) -> BrokerAccount:
     if brokers(db):
         raise ServiceError("A broker is already connected; remove it first")
     row = BrokerAccount(
-        broker="zerodha", label=label.strip()[:100], client_id=client_id.strip().upper()[:50],
+        broker="zerodha",
+        label=label.strip()[:100],
+        client_id=client_id.strip().upper()[:50],
         api_key_enc=crypto.encrypt(settings, api_key.strip()),
         api_secret_enc=crypto.encrypt(settings, api_secret.strip()),
-        status="needs_login", created_by=str(user.id),
-    )  # fmt: skip
+        status="needs_login",
+        created_by=str(user.id),
+    )
     db.add(row)
     db.flush()
     _audit(db, user, "broker_added", broker="zerodha", client_id=row.client_id)
@@ -345,14 +459,23 @@ def login_url(db: Session, settings: Settings, broker_id: int) -> str:
     return KITE_LOGIN.format(api_key=crypto.decrypt(settings, row.api_key_enc) or "")
 
 
-def complete_login(db: Session, settings: Settings, user: User, broker_id: int, request_token: str,
-                   client: KiteClient | None = None, now: datetime | None = None) -> BrokerAccount:  # fmt: skip
+def complete_login(
+    db: Session,
+    settings: Settings,
+    user: User,
+    broker_id: int,
+    request_token: str,
+    client: KiteClient | None = None,
+    now: datetime | None = None,
+) -> BrokerAccount:
     now = now or datetime.now(UTC)
     row = _get_broker(db, broker_id)
     api_key = crypto.decrypt(settings, row.api_key_enc)
     secret = crypto.decrypt(settings, row.api_secret_enc)
     if not api_key or not secret:
-        raise ServiceError("Saved keys can't be read (the server secret changed); re-add the broker")
+        raise ServiceError(
+            "Saved keys can't be read (the server secret changed); re-add the broker"
+        )
     kite = client or KiteClient(api_key)
     try:
         token = kite.create_session(request_token.strip(), secret)
@@ -377,3 +500,20 @@ def remove_broker(db: Session, user: User, broker_id: int) -> None:
     _audit(db, user, "broker_removed", client_id=row.client_id)
     db.delete(row)
     db.commit()
+
+
+def spoken_status(db: Session) -> str:
+    view = overview(db)
+    a = view["account"]
+    s = view["stats"][a["mode"]]
+    won = (
+        f"{s['win_rate']:.0%} of {s['trades']} trades won"
+        if s["trades"]
+        else "no trades closed yet"
+    )
+    state = f" Trading is blocked: {a['blocked']}." if a["blocked"] else ""
+    return (
+        f"{a['mode'].title()} trading: balance ₹{a['equity']:.2f} from "
+        f"₹{a['starting_capital']:.2f} ({a['total_return_pct']:+.2f}%), today "
+        f"₹{a['day_pnl']:+.2f}, {won}, {len(view['positions'])} open position(s).{state}"
+    )
