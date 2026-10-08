@@ -36,7 +36,7 @@ docker compose up --build
 
 The web app is served on http://localhost:8080; nginx proxies `/api` to the backend. On start the
 backend applies migrations (`alembic upgrade head`) and registers any new catalog agents. Create
-the owner in the browser or with `docker compose exec backend uv run --no-sync matt create-owner --email you@example.com`.
+the owner in the browser or with `docker compose exec backend matt create-owner --email you@example.com`.
 
 The stack is free to run on a single small VM. Managed PostgreSQL or a PaaS can replace any
 piece; only environment variables change.
