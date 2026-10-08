@@ -39,8 +39,9 @@ function findPage(text: string) {
 }
 
 export const CAPABILITIES =
-  "I can open any page, report system health, summarise the workforce, list the executives, " +
-  "look up any agent or skill, read the latest audit activity, tell the time, and sign you out.";
+  "Ask me to find businesses in a city that need a better website, audit any website, research new " +
+  "opportunities, or brief you on status. Anything else goes to your CEO agent and its team. " +
+  "I can also open any page, check system health, look up any agent, and sign you out.";
 
 /** Interpret one spoken or typed command against the live MATT API. */
 export async function runCommand(raw: string, ctx: CommandContext): Promise<CommandOutcome> {
@@ -68,7 +69,7 @@ export async function runCommand(raw: string, ctx: CommandContext): Promise<Comm
     return { say: `It's ${time} on ${date}.` };
   }
 
-  if (has(t, "health", "status", "system", "systems", "online")) {
+  if (/\b(health|system status|systems|online)\b/.test(t)) {
     try {
       const h = await api.health();
       return h.status === "ok"
@@ -79,12 +80,13 @@ export async function runCommand(raw: string, ctx: CommandContext): Promise<Comm
     }
   }
 
-  const agentQuery = /\b(?:tell me about|who is|what is|what does|find|look ?up|search for|open agent)\s+(?:the\s+)?(.+?)(?:\s+(?:agent|skill|do))?$/i.exec(text);
+  const agentQuery = /\b(?:tell me about|who is|what is|what does|look ?up|open agent)\s+(?:the\s+)?(.+?)(?:\s+(?:agent|skill|do))?$/i.exec(text);
   if (agentQuery?.[1] && !findPage(agentQuery[1])) {
     const q = agentQuery[1];
     const hits = await api.agents({ q });
     const first = hits[0];
-    if (!first) return { say: `I couldn't find an agent matching ${q}.` };
+    // No such agent: it was probably a real request ("what is our best opportunity"), so ask the CEO.
+    if (!first) return askAgents(text);
     const detail = await api.agent(first.slug);
     const more = hits.length > 1 ? ` I found ${hits.length - 1} other match${hits.length > 2 ? "es" : ""} too.` : "";
     return {
@@ -105,7 +107,7 @@ export async function runCommand(raw: string, ctx: CommandContext): Promise<Comm
     return { say: `Your executive team is ${list(execs.map((e) => e.name))}.`, navigate: "/workforce" };
   }
 
-  if (has(t, "how many", "workforce", "summary", "agents", "skills", "team")) {
+  if (/\bhow many (agents|skills|executives)\b|\bworkforce\b|\b(agent|registry) summary\b/.test(t)) {
     const s = await api.registrySummary();
     const depts = Object.entries(s.by_department).sort((a, b) => b[1] - a[1]).slice(0, 3);
     return {
@@ -116,14 +118,24 @@ export async function runCommand(raw: string, ctx: CommandContext): Promise<Comm
     };
   }
 
-  if (has(t, "audit", "activity", "recent", "what happened", "latest")) {
+  if (/\b(audit log|recent activity|latest activity|audit trail)\b/.test(t)) {
     const logs = await api.auditLogs();
     if (!logs.length) return { say: "The audit log is empty.", navigate: "/audit-log" };
     const recent = logs.slice(0, 3).map((l) => l.action.replace(/[._]/g, " "));
     return { say: `The latest activity: ${list(recent)}.`, navigate: "/audit-log" };
   }
 
-  return {
-    say: `I heard "${text}", but I can't do that yet. Running tasks through the agents isn't built yet. Say "help" to hear what I can do.`,
-  };
+  return askAgents(text);
+}
+
+/** Pages to show after the backend starts work, so the owner can watch results arrive. */
+const INTENT_PAGE: Record<string, string> = {
+  website_opportunities: "/leads",
+  opportunity_research: "/opportunities",
+};
+
+/** Anything MATT can't answer locally goes to the backend command API: workflows or the CEO agent. */
+async function askAgents(text: string): Promise<CommandOutcome> {
+  const res = await api.command(text);
+  return { say: res.reply, navigate: INTENT_PAGE[res.intent] };
 }

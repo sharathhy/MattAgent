@@ -56,8 +56,18 @@ describe("commands", () => {
     expect(tasks.say).toContain("isn't built yet");
   });
 
-  it("says plainly when it can't do something", async () => {
-    expect((await runCommand("launch a marketing campaign", ctx)).say).toContain("can't do that yet");
+  it("hands real work to the backend agents", async () => {
+    const fetch = mockApi({
+      "/command": { reply: "On it. I'm finding gyms in Bangalore.", intent: "website_opportunities", task_id: 7, data: {} },
+    });
+    const out = await runCommand("find gyms in Bangalore that need a website", ctx);
+    expect(out).toEqual({ say: "On it. I'm finding gyms in Bangalore.", navigate: "/leads" });
+    expect(JSON.parse(fetch.mock.calls[0]?.[1]?.body as string)).toEqual({ text: "find gyms in Bangalore that need a website" });
+  });
+
+  it("asks the CEO when a lookup matches no agent", async () => {
+    mockApi({ "/agents": [], "/command": { reply: "Our best bet is local SEO.", intent: "ceo", task_id: 8, data: {} } });
+    expect((await runCommand("what is our best opportunity", ctx)).say).toBe("Our best bet is local SEO.");
   });
 
   it("goes back to sleep on stop", async () => {
@@ -132,6 +142,6 @@ describe("always-on voice assistant", () => {
     mockApi({ "/auth/me": OWNER, "/agents/summary": SUMMARY, "/health": HEALTH });
     renderApp("/command-center");
     await userEvent.type(await screen.findByLabelText("Command"), "what can you do{Enter}");
-    expect(await screen.findByText(/I can open any page/)).toBeInTheDocument();
+    expect(await screen.findByText(/audit any website/)).toBeInTheDocument();
   });
 });

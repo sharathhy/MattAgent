@@ -3,6 +3,7 @@ import type {
   AuthStatus,
   AgentSummary,
   AuditLog,
+  CommandResponse,
   Health,
   HierarchyNode,
   RegistrySummary,
@@ -81,4 +82,5 @@ export const api = {
   registrySummary: () => request<RegistrySummary>("/agents/summary"),
   hierarchy: () => request<HierarchyNode[]>("/agents/hierarchy"),
   auditLogs: () => request<AuditLog[]>("/audit-logs"),
+  command: (text: string) => post<CommandResponse>("/command", { text }),
 };

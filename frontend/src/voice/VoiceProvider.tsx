@@ -231,11 +231,15 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       clearTimeout(awakeTimer.current);
       push("you", command);
       setState("thinking");
+      // The CEO agent can take a while; say so instead of looking frozen.
+      const slow = setTimeout(() => push("system", "Working on it with the team…"), 2500);
       let outcome;
       try {
         outcome = await runCommand(command, { userName });
       } catch (err) {
         outcome = { say: `That failed: ${err instanceof Error ? err.message : "unknown error"}.` };
+      } finally {
+        clearTimeout(slow);
       }
       if (outcome.navigate) navigate(outcome.navigate);
       push("matt", outcome.say);

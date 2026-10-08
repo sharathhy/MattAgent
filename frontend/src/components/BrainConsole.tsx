@@ -87,8 +87,8 @@ export function BrainConsole() {
           <div className="flex-1 space-y-2 overflow-y-auto pr-1 lg:max-h-[380px]" aria-label="Conversation log">
             {voice.log.length === 0 && (
               <div className="rounded-lg border border-dashed border-line p-4 text-sm text-muted">
-                Say <span className="text-accent">“Hey Matt”</span>, then ask: <em>“how many agents do we have?”</em>,{" "}
-                <em>“system status”</em>, <em>“who is the CFO?”</em>, <em>“open the workforce map”</em> or{" "}
+                Say <span className="text-accent">“Hey Matt”</span>, then ask: <em>“find gyms in Bangalore”</em>,{" "}
+                <em>“audit example.com”</em>, <em>“brief me”</em>, <em>“what should we build next?”</em> or{" "}
                 <em>“what can you do?”</em>. You can also type below.
               </div>
             )}

@@ -100,3 +100,10 @@ export interface AuthStatus {
   web_bootstrap_enabled: boolean;
   google_client_id: string | null;
 }
+
+export interface CommandResponse {
+  reply: string;
+  intent: string;
+  task_id: number | null;
+  data: Record<string, unknown>;
+}
