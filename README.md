@@ -20,7 +20,9 @@ What works today:
   exponential backoff; failures are recorded, never hidden.
 - **Free-tier model router.** Gemini free tier, Groq free tier or local Ollama. Paid and
   premium models are locked out by `MATT_FREE_MODELS_ONLY` (on by default); if you ever unlock
-  them they stop at your daily and monthly INR budget and ask you in Approvals.
+  them they stop at your daily and monthly INR budget and ask you in Approvals. The one
+  exception: with `MATT_ANTHROPIC_API_KEY` and `MATT_CODE_AI_MONTHLY_BUDGET_INR` set, Claude
+  drafts "Change MATT" code changes only, within that monthly cap, with its cost shown apart.
 - **Website opportunity pipeline.** Discover businesses on OpenStreetMap by city and category,
   audit their websites (UX, design, SEO, mobile, performance, conversion, technical), rank leads,
   and draft outreach that waits for your approval.

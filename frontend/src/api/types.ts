@@ -481,6 +481,7 @@ export interface ChangeRequest {
   error: string | null;
   model: string | null;
   approval_id: number | null;
+  cost_inr: number;
   created_at: string;
 }
 
@@ -489,4 +490,14 @@ export interface ChangeConfig {
   repo: string;
   base_branch: string;
   free_models_only: boolean;
+  code_ai: CodeAiStatus;
+}
+
+/** Claude is used only for drafting Change MATT code, inside the owner's cap. */
+export interface CodeAiStatus {
+  provider: "claude" | "free";
+  model: string | null;
+  monthly_cap_inr: number;
+  spent_30d_inr: number;
+  scope: string;
 }

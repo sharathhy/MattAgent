@@ -8,8 +8,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
+from app.llm.providers import ModelSpec
 from app.llm.router import ModelRouter
-from app.models import ChangeRequest
+from app.models import ChangeRequest, ModelUsage
 from app.services import changes, github, tasks
 from tests.fakes import FakeProvider, free
 
@@ -161,3 +162,54 @@ def test_voice_command_creates_a_change_request(
                      headers=viewer_headers)  # fmt: skip
     assert r2.status_code == 403
     assert json.dumps(client.get("/api/changes", headers=owner_headers).json()).count('"id"') == 1
+
+
+def _claude(monkeypatch: pytest.MonkeyPatch, replies: list[str]) -> FakeProvider:
+    spec = ModelSpec("anthropic", "claude-test", "premium", 5, usd_in_per_m=4.0, usd_out_per_m=20.0)
+    fake = FakeProvider(spec, replies)
+    monkeypatch.setattr(changes, "AnthropicProvider", lambda _spec, _key: fake)
+    return fake
+
+
+def test_claude_drafts_code_changes_only_within_the_owner_cap(
+    client: TestClient, owner_headers: dict[str, str], seeded: None, gh: FakeGitHub,
+    db: Session, settings: Settings, monkeypatch: pytest.MonkeyPatch,
+) -> None:  # fmt: skip
+    claude = _claude(monkeypatch, ["frontend/src/pages/SettingsPage.tsx", DRAFT])
+    business = free(["frontend/src/pages/SettingsPage.tsx", DRAFT])
+    router = _router(client, business)
+    status = client.get("/api/changes/config", headers=owner_headers).json()["code_ai"]
+    assert status["provider"] == "free"  # no key and no cap: Claude stays off
+
+    settings.anthropic_api_key = "sk-test"
+    settings.code_ai_monthly_budget_inr = 500
+    assert settings.free_models_only  # the business lock stays on
+    client.post("/api/changes", json={"request": "Add a dark mode note"}, headers=owner_headers)
+    drain(db, router)
+    assert len(claude.calls) == 2 and not business.calls
+    change = client.get("/api/changes", headers=owner_headers).json()[0]
+    assert change["status"] == "awaiting_approval" and change["cost_inr"] > 0
+    status = client.get("/api/changes/config", headers=owner_headers).json()["code_ai"]
+    assert status["provider"] == "claude" and status["monthly_cap_inr"] == 500
+    assert status["spent_30d_inr"] == pytest.approx(change["cost_inr"])
+
+    # Business work never reaches Claude, even with the key set.
+    assert not any(p.spec.provider == "anthropic" for p in ModelRouter(settings).providers)
+
+
+def test_claude_falls_back_to_free_model_at_the_cap(
+    client: TestClient, owner_headers: dict[str, str], seeded: None, gh: FakeGitHub,
+    db: Session, settings: Settings, monkeypatch: pytest.MonkeyPatch,
+) -> None:  # fmt: skip
+    claude = _claude(monkeypatch, ["x"])
+    fallback = free(["frontend/src/pages/SettingsPage.tsx", DRAFT])
+    router = _router(client, fallback)
+    settings.anthropic_api_key = "sk-test"
+    settings.code_ai_monthly_budget_inr = 0.0001  # spent after one call
+    db.add(ModelUsage(provider="anthropic", model="claude-test", cost_inr=1,
+                      success=True))  # fmt: skip
+    db.commit()
+    client.post("/api/changes", json={"request": "Add a dark mode note"}, headers=owner_headers)
+    drain(db, router)
+    assert not claude.calls and len(fallback.calls) == 2
+    assert db.query(ChangeRequest).one().status == "awaiting_approval"

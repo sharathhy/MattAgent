@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { api } from "../api/client";
+import type { CodeAiStatus } from "../api/types";
 import { DiffView } from "../pages/ApprovalsPage";
 import { ActionError, Badge, Field, useAction } from "./kit";
 import { formatDate } from "../lib/format";
@@ -29,10 +30,11 @@ export function ChangeRequests() {
     <Panel title="Change MATT">
       <p className="text-xs text-muted">
         Describe a change to MATT itself (or say "Hey Matt, change your code to …"). MATT drafts a plan and the exact code with
-        {c?.free_models_only === false ? " the AI model" : " the free AI model"}, and nothing changes until you approve it in{" "}
+        {c?.code_ai.provider === "claude" ? " Claude" : " the free AI model"}, and nothing changes until you approve it in{" "}
         <Link className="text-accent" to="/approvals">Approvals</Link>. Then it opens a pull request on {c?.repo ?? "GitHub"} for you
         to review and merge; MATT never merges or deploys by itself.
       </p>
+      {c && <CodeAi status={c.code_ai} />}
       {c && !c.github_connected && (
         <p className="mt-2 text-sm text-amber-300">
           Add MATT_GITHUB_TOKEN in Render: a fine-grained GitHub token for {c.repo} only, with Contents and Pull requests
@@ -81,7 +83,11 @@ export function ChangeRequests() {
                 <div className="mt-3 space-y-2">
                   {ch.plan && <pre className="whitespace-pre-wrap rounded-lg bg-slate-950/60 p-3 font-sans text-sm">{ch.plan}</pre>}
                   {ch.diff && <DiffView diff={ch.diff} />}
-                  {ch.model && <p className="text-xs text-muted">Drafted by {ch.model}.</p>}
+                  {ch.model && (
+                    <p className="text-xs text-muted">
+                      Drafted by {ch.model} · AI cost {ch.cost_inr > 0 ? inr(ch.cost_inr) : "free"}.
+                    </p>
+                  )}
                 </div>
               )}
             </li>
@@ -89,5 +95,31 @@ export function ChangeRequests() {
         </ul>
       )}
     </Panel>
+  );
+}
+
+const inr = (n: number) => `₹${n.toFixed(2)}`;
+
+/** Which model drafts code changes, and Claude's spend against the owner's cap, kept apart from business AI. */
+function CodeAi({ status }: { status: CodeAiStatus }) {
+  if (status.provider === "free") {
+    return (
+      <p className="mt-2 text-xs text-muted">
+        Code AI: free model. To draft code changes with Claude only, add MATT_ANTHROPIC_API_KEY and a monthly cap in
+        MATT_CODE_AI_MONTHLY_BUDGET_INR in Render. Business work always stays on free models.
+      </p>
+    );
+  }
+  const used = status.monthly_cap_inr > 0 ? Math.min(100, (status.spent_30d_inr / status.monthly_cap_inr) * 100) : 0;
+  return (
+    <div className="mt-2 space-y-1 text-xs text-muted">
+      <p>
+        Code AI: Claude ({status.model}) · {inr(status.spent_30d_inr)} of your {inr(status.monthly_cap_inr)} cap used in
+        the last 30 days. At the cap MATT drafts with the free model. {status.scope}
+      </p>
+      <div className="h-1.5 w-full max-w-sm rounded bg-slate-800">
+        <div className="h-1.5 rounded bg-accent" style={{ width: `${used}%` }} />
+      </div>
+    </div>
   );
 }
