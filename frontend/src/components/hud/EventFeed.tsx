@@ -11,11 +11,13 @@ const TONE: Record<string, string> = {
   requested: "text-warn",
   started: "text-accent",
   received: "text-accent-2",
+  cycle: "text-hot",
+  ready: "text-ok",
 };
 
 function describe(e: MattEvent): string {
   const p = e.payload;
-  const text = (p.objective ?? p.summary ?? p.text ?? p.action ?? p.error ?? "") as string;
+  const text = (p.objective ?? p.summary ?? p.text ?? p.action ?? p.title ?? p.error ?? "") as string;
   return `${e.type.replace(".", " ")}${text ? ` · ${String(text).slice(0, 90)}` : ""}`;
 }
 

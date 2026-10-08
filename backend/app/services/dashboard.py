@@ -20,7 +20,7 @@ from app.models import (
     Opportunity,
     Task,
 )
-from app.services import earnings
+from app.services import autopilot, earnings
 
 
 def _num(v: Any) -> float:
@@ -59,7 +59,20 @@ def overview(db: Session, router: ModelRouter, settings: Settings) -> dict[str, 
     revenue_month = _ledger_total(db, "revenue", month_start)
     expense_month = _ledger_total(db, "expense", month_start)
     earned = earnings.summary(db, settings.timezone)
+    pilot = autopilot.status(db, router)
     return {
+        "autopilot": {
+            k: pilot[k]
+            for k in (
+                "enabled",
+                "last_action",
+                "last_cycle_at",
+                "next_cycle_at",
+                "cycles_today",
+                "active",
+                "ai_model_available",
+            )
+        },
         "earnings": earned,
         "revenue": {
             "truth": "fact",

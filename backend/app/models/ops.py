@@ -114,3 +114,21 @@ class ModelUsage(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, index=True
     )
+
+
+class Autopilot(TimestampMixin, Base):
+    """Single-row configuration for MATT's self-directed work loop."""
+
+    __tablename__ = "autopilot"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    cities: Mapped[list[str]] = mapped_column(JSON, default=list)
+    categories: Mapped[list[str]] = mapped_column(JSON, default=list)
+    interval_minutes: Mapped[int] = mapped_column(Integer, default=30)
+    daily_outreach_drafts: Mapped[int] = mapped_column(Integer, default=5)
+    cursor: Mapped[int] = mapped_column(Integer, default=0)
+    last_cycle_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    next_cycle_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_action: Mapped[str | None] = mapped_column(String(300))
+    updated_by: Mapped[str | None] = mapped_column(String(100))

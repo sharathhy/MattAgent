@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { api } from "../api/client";
+import { AutopilotPanel } from "../components/AutopilotPanel";
 import { Badge, PageHeader, Table, inr, useCan } from "../components/kit";
 import { ErrorState, Loading, Panel } from "../components/ui";
 
@@ -14,6 +15,7 @@ export function SettingsPage() {
   return (
     <div className="space-y-5">
       <PageHeader eyebrow="System" title="Settings" />
+      <AutopilotPanel full />
       <p className="text-sm text-muted">
         Secrets live only in the hosting environment (Render → Environment), never in the app or the repository. This page
         shows whether each one is set, not its value.

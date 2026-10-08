@@ -302,6 +302,9 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
         clearTimeout(slow);
       }
       if (outcome.navigate) navigate(outcome.navigate);
+      // Commands like "start autopilot" change what the HUD shows; refresh it right away.
+      void qc.invalidateQueries({ queryKey: ["autopilot"] });
+      void qc.invalidateQueries({ queryKey: ["dashboard"] });
       push("matt", outcome.say, outcome.link);
       if (outcome.link) {
         // Works when the command was typed or tapped; voice-only commands get the link in the log.

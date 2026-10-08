@@ -1,8 +1,11 @@
+import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, Mic } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { api } from "../../api/client";
 import { STATE_LABEL, useVoice, type VoiceState } from "../../voice/VoiceProvider";
 import { Brain } from "../Brain";
+import { AutopilotHud } from "./AutopilotHud";
 
 const STATE_TONE: Record<VoiceState, string> = {
   unsupported: "text-muted",
@@ -25,6 +28,8 @@ const brainSize = () => {
 /** Centre of the HUD: the brain inside its reactor rings, what it hears, and why voice is off when it is. */
 export function BrainCore() {
   const voice = useVoice();
+  const dash = useQuery({ queryKey: ["dashboard"], queryFn: api.dashboard, refetchInterval: 5000 });
+  const autopilot = dash.data?.autopilot?.enabled ?? false;
   const [size, setSize] = useState(brainSize);
 
   useEffect(() => {
@@ -42,7 +47,7 @@ export function BrainCore() {
         aria-label="Talk to MATT"
         title="Tap to talk without the wake phrase"
       >
-        <Brain state={voice.state} signals={voice.signals} size={size} />
+        <Brain state={voice.state} signals={voice.signals} size={size} autopilot={autopilot} />
       </button>
       <div role="status" aria-live="polite" className={`hud-title -mt-3 text-center text-xs md:text-sm ${STATE_TONE[voice.state]}`}>
         <span className={voice.state === "sleeping" ? "flicker" : voice.state === "awake" ? "animate-pulse" : ""}>
@@ -67,6 +72,7 @@ export function BrainCore() {
           Click the lock or mic icon in the address bar, allow the microphone for this site, then press “Try voice again”.
         </p>
       )}
+      <AutopilotHud />
     </section>
   );
 }

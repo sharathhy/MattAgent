@@ -41,8 +41,20 @@ API's server-side fallback, so a refused request is retried once on a fallback m
 Paid models run only within `MATT_DAILY_AI_BUDGET_INR` and `MATT_MONTHLY_AI_BUDGET_INR`
 (default 0, so they never run without your approval).
 
-The worker runs inside the web service. On Render's free plan the service sleeps when idle, so
-queued work pauses until the next visit wakes it; anything left running is re-queued on start.
+The worker runs inside the web service. On Render's free plan the service sleeps after about
+15 minutes without visitors, which also pauses the worker and autopilot; anything left running
+is re-queued when it wakes.
+
+### Keep autopilot running (free)
+
+Autopilot (Settings → Autopilot, or say "start autopilot") needs the service awake. Point a free
+uptime monitor at the health check so it never sleeps:
+
+1. Sign up at https://uptimerobot.com (free) and add an HTTP(s) monitor.
+2. URL: `https://<your-service>.onrender.com/api/health`, interval 5 minutes.
+
+One always-on free service uses about 744 of Render's 750 free hours a month. Without the ping,
+autopilot still works but only while someone has MATT open.
 
 ## Sign in with Google
 

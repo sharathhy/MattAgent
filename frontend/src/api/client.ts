@@ -1,4 +1,5 @@
 import type {
+  AutopilotStatus,
   AgentDetail,
   AgentSummary,
   Analytics,
@@ -114,6 +115,10 @@ export const api = {
   analytics: () => request<Analytics>("/analytics"),
   events: (afterId = 0) => request<MattEvent[]>(`/events${query({ after_id: afterId })}`),
   settings: () => request<SystemSettings>("/settings"),
+  autopilot: () => request<AutopilotStatus>("/autopilot"),
+  updateAutopilot: (body: Partial<Pick<AutopilotStatus, "enabled" | "cities" | "categories" | "interval_minutes" | "daily_outreach_drafts">>) =>
+    send<AutopilotStatus>("PUT", "/autopilot", body),
+  runAutopilot: () => post<Task | null>("/autopilot/run", {}),
 
   tasks: (filters: { status?: string; agent?: string } = {}) => request<Task[]>(`/tasks${query(filters)}`),
   task: (id: number) => request<Task>(`/tasks/${id}`),

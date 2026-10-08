@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.core.domain import ApprovalStatus, RevenueCategory
 from app.models import Approval, Knowledge, Lead, Opportunity, User
-from app.services import earnings, events
+from app.services import autopilot, earnings, events
 
 
 @dataclass
@@ -66,6 +66,15 @@ REMEMBER = re.compile(r"^(?:please\s+)?remember(?:\s+that)?\s+(.{3,})$", re.I | 
 TIME = re.compile(r"\bwhat(?:'s| is)? the (time|date|day)\b|\bwhat time is it\b")
 THANKS = re.compile(r"^(thanks|thank you|great|awesome|ok(?:ay)?|cool|nice)[.! ]*$")
 DISMISS = re.compile(r"^(stop|cancel|never ?mind|go to sleep|that'?s all|nothing)[.! ]*$")
+AUTOPILOT_ON = re.compile(
+    r"\b(start|turn on|enable|resume)\b.*\b(autopilot|auto ?pilot|working on your own|autonomous)\b"
+    r"|^(start working|get to work|work on your own)$"
+)
+AUTOPILOT_OFF = re.compile(
+    r"\b(stop|turn off|disable|pause)\b.*\b(autopilot|auto ?pilot|working on your own|autonomous)\b"
+    r"|^(stop working|pause work)$"
+)
+AUTOPILOT_STATUS = re.compile(r"\bwhat are you (working on|doing)\b|\bautopilot( status)?\b")
 HELP = re.compile(r"\b(what can you do|help|how do (?:i|you) use)\b")
 
 MULTIPLIER = {"k": 1_000, "thousand": 1_000, "lakh": 100_000, "lakhs": 100_000,
@@ -124,6 +133,27 @@ def answer(db: Session, user: User, raw: str, tz: str) -> Answer | None:
             "pass bigger questions to the CEO agent.",
             "help",
         )
+    if AUTOPILOT_ON.search(text) or AUTOPILOT_OFF.search(text):
+        on = bool(AUTOPILOT_ON.search(text))
+        if user.role != "owner":
+            return Answer("Only the owner can switch autopilot on or off.", "autopilot")
+        autopilot.update(db, user, {"enabled": on})
+        return Answer(
+            "Autopilot is on. I'll keep finding and auditing leads, scoring opportunities and "
+            "drafting pitches for your approval. I won't send or spend anything without you."
+            if on
+            else "Autopilot is off. I'll only work when you ask.",
+            "autopilot",
+            {"enabled": on},
+        )
+    if AUTOPILOT_STATUS.search(text):
+        row = autopilot.get(db)
+        if not row.enabled:
+            return Answer("Autopilot is off. Say \"start autopilot\" to let me work on my own.",
+                          "autopilot", {"enabled": False})  # fmt: skip
+        last = row.last_action or "getting started"
+        return Answer(f"Autopilot is on. Latest: {last}.", "autopilot", {"enabled": True})
+
     if TIME.search(text):
         now = datetime.now(ZoneInfo(tz))
         return Answer(f"It's {now:%-I:%M %p} on {now:%A, %-d %B}.", "time")

@@ -104,18 +104,22 @@ function buildMesh(count: number) {
 const mix = (a: number[], b: number[], t: number) => a.map((v, i) => v + ((b[i] ?? v) - v) * t);
 const rgba = (c: number[], a: number) => `rgba(${c[0]! | 0},${c[1]! | 0},${c[2]! | 0},${a})`;
 
-export function Brain({ state, signals, size = 420, compact = false }: {
+export function Brain({ state, signals, size = 420, compact = false, autopilot = false }: {
   state: VoiceState;
   signals: BrainSignals;
   size?: number;
   compact?: boolean;
+  /** MATT is working on its own: an orange orbit circles the brain. */
+  autopilot?: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stateRef = useRef(state);
+  const autopilotRef = useRef(autopilot);
 
   useEffect(() => {
     stateRef.current = state;
-  }, [state]);
+    autopilotRef.current = autopilot;
+  }, [state, autopilot]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -244,6 +248,7 @@ export function Brain({ state, signals, size = 420, compact = false }: {
 
       if (!compact) {
         drawReactor(ctx, cx, cy, R, t * motion, cur, level, stateRef.current, wave);
+        if (autopilotRef.current) drawOrbit(ctx, cx, cy, R, t * motion);
       }
 
       raf = requestAnimationFrame(draw);
@@ -355,4 +360,28 @@ function drawReactor(
   if (state === "awake") {
     arc(R * 1.5, 0, Math.PI * 2, rgba(cur.pulse, 0.25 + 0.2 * Math.sin(t * 6)), 2);
   }
+}
+
+/** Autopilot: two orange satellites orbiting on a tilted ring, trailing light. */
+function drawOrbit(ctx: CanvasRenderingContext2D, cx: number, cy: number, R: number, t: number) {
+  const rx = R * 2.05;
+  const ry = R * 0.62;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(-0.35);
+  ctx.strokeStyle = rgba(HOT, 0.22);
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  for (const offset of [0, Math.PI]) {
+    for (let k = 0; k < 14; k++) {
+      const a = t * 1.4 + offset - k * 0.045;
+      ctx.fillStyle = rgba(HOT, 0.9 * (1 - k / 14));
+      ctx.beginPath();
+      ctx.arc(Math.cos(a) * rx, Math.sin(a) * ry, 3.2 * (1 - k / 18), 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
 }
