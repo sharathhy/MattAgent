@@ -7,7 +7,7 @@ import sys
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.db.session import get_sessionmaker
-from app.services import auth, registry
+from app.services import auth, registry, tools
 from app.services.errors import ServiceError
 
 
@@ -27,6 +27,7 @@ def main(argv: list[str] | None = None) -> int:
             if args.command == "seed-registry":
                 result = registry.seed_registry(db)
                 print(f"Registry: {result.created} created, {result.existing} already registered")
+                print(f"Tools: {tools.seed_tools(db)} registered")
             else:
                 password = getpass.getpass("Owner password (12+ chars): ")
                 if len(password) < 12:
