@@ -94,3 +94,24 @@ def test_thinking_models_get_room_and_empty_replies_are_errors(
     with pytest.raises(providers.ProviderError, match="empty reply \\(length\\)"):
         gemini.complete("s", "p", 700)
     assert limits == [700 + GeminiProvider.THINKING_HEADROOM]
+
+
+def test_free_limit_hit_rotates_to_the_next_free_provider(settings: Settings, db: Any) -> None:
+    from dataclasses import replace
+
+    first = free()
+    first.spec = replace(first.spec, provider="gemini")
+
+    def limited(system: str, prompt: str, max_tokens: int) -> Any:
+        first.calls.append((system, prompt))
+        raise providers.ProviderError("gemini HTTP 429: RESOURCE_EXHAUSTED quota")
+
+    first.complete = limited  # type: ignore[method-assign]
+    second = free(["from groq"])
+    second.spec = replace(second.spec, provider="groq")
+    router = ModelRouter(settings, providers=[first, second])
+    assert router.complete(db, system="s", prompt="p").completion.text == "from groq"
+    assert router.resting("gemini") and router.lanes() == ["groq"]
+    # While Gemini rests, work goes straight to the next free provider.
+    router.complete(db, system="s", prompt="p", prefer="gemini")
+    assert len(first.calls) == 1 and len(second.calls) == 2

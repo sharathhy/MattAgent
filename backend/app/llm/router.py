@@ -7,6 +7,7 @@ the next candidate.
 """
 
 import logging
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -91,9 +92,15 @@ def build_providers(settings: Settings) -> list[Provider]:
     return providers
 
 
+#: How long a free provider that said "quota used up" is moved to the back of the line.
+LIMIT_COOLDOWN = timedelta(minutes=5)
+_LIMITED = re.compile(r"HTTP 429|quota|rate.?limit|resource.?exhausted|tokens? per", re.I)
+
+
 class ModelRouter:
     def __init__(self, settings: Settings, providers: list[Provider] | None = None) -> None:
         self.settings = settings
+        self._resting: dict[str, datetime] = {}  # provider -> when its free limit may be back
         self.providers = sorted(
             build_providers(settings) if providers is None else providers,
             key=lambda p: (TIER_ORDER[p.spec.tier], -p.spec.quality),
@@ -103,9 +110,16 @@ class ModelRouter:
     def available(self) -> bool:
         return any(self._eligible(p, 1) for p in self.providers)
 
+    def resting(self, provider: str) -> bool:
+        until = self._resting.get(provider)
+        return until is not None and datetime.now(UTC) < until
+
     def lanes(self) -> list[str]:
-        """Distinct usable providers, so parallel work can spread across free tiers."""
-        return list(dict.fromkeys(p.spec.provider for p in self.providers if self._eligible(p, 1)))
+        """Distinct usable providers, so parallel work can spread across free tiers. Providers
+        whose free limit just ran out sit out until their cooldown ends."""
+        usable = [p.spec.provider for p in self.providers if self._eligible(p, 1)]
+        awake = [slug for slug in usable if not self.resting(slug)]
+        return list(dict.fromkeys(awake or usable))
 
     def provider(self, slug: str) -> Provider | None:
         return next((p for p in self.providers if p.spec.provider == slug), None)
@@ -157,6 +171,8 @@ class ModelRouter:
         candidates = [p for p in self.providers if self._eligible(p, min_quality)]
         if prefer:  # parallel bots each start on their own free provider, then fall back
             candidates.sort(key=lambda p: p.spec.provider != prefer)
+        # Free tiers whose limit just ran out go last: the next free provider answers instead.
+        candidates.sort(key=lambda p: self.resting(p.spec.provider))
         if not candidates:
             raise NoModelAvailable(
                 "No AI model is configured. Set MATT_GEMINI_API_KEY (free) or another provider."
@@ -177,6 +193,8 @@ class ModelRouter:
                 log.warning("model call failed", extra={"provider": spec.provider, "err": str(exc)})
                 self._record(db, task_id, spec, None, str(exc))
                 errors.append(str(exc))
+                if _LIMITED.search(str(exc)):
+                    self._resting[spec.provider] = datetime.now(UTC) + LIMIT_COOLDOWN
                 continue
             cost = self._record(db, task_id, spec, result, None)
             return RoutedCompletion(result, spec, cost)
