@@ -135,3 +135,11 @@ def test_voice_controls_autopilot(
     assert "Autopilot is on" in r.json()["reply"]
     r = client.post("/api/command", json={"text": "stop autopilot"}, headers=owner_headers)
     assert client.get("/api/autopilot", headers=owner_headers).json()["enabled"] is False
+
+
+def test_rows_left_off_by_an_old_version_turn_on(db: Session) -> None:
+    from app.models import Autopilot
+
+    db.add(Autopilot(enabled=False, cities=["Mysuru"], categories=["gyms"]))
+    db.commit()
+    assert autopilot.get(db).enabled is True
