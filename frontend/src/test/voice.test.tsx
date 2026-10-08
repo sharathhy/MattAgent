@@ -25,6 +25,7 @@ describe("wake phrase", () => {
     ["hey mat show me the agents", "show me the agents"],
     ["okay Matt, system status?", "system status?"],
     ["so I said hey Matt what time is it", "what time is it"],
+    ["Matt, brief me", "brief me"],
   ])("wakes on %j", (said, rest) => {
     expect(detectWake(said)).toEqual({ rest });
   });
@@ -61,7 +62,7 @@ describe("commands", () => {
       "/command": { reply: "On it. I'm finding gyms in Bangalore.", intent: "website_opportunities", task_id: 7, data: {} },
     });
     const out = await runCommand("find gyms in Bangalore that need a website", ctx);
-    expect(out).toEqual({ say: "On it. I'm finding gyms in Bangalore.", navigate: "/leads" });
+    expect(out).toEqual({ say: "On it. I'm finding gyms in Bangalore.", navigate: "/leads", taskId: 7 });
     expect(JSON.parse(fetch.mock.calls[0]?.[1]?.body as string)).toEqual({ text: "find gyms in Bangalore that need a website" });
   });
 
@@ -72,6 +73,39 @@ describe("commands", () => {
 
   it("goes back to sleep on stop", async () => {
     expect(await runCommand("never mind", ctx)).toMatchObject({ sleep: true });
+  });
+});
+
+describe("everyday skills", () => {
+  const ctx = { userName: "Sharath" };
+
+  it("sets timers and reminders", async () => {
+    expect(await runCommand("set a timer for 5 minutes", ctx)).toMatchObject({ timer: { ms: 300_000 } });
+    const r = await runCommand("remind me in 10 minutes to call Ravi", ctx);
+    expect(r).toMatchObject({ say: "Okay, I'll remind you to call Ravi in 10 minutes.", timer: { ms: 600_000, label: "call Ravi" } });
+  });
+
+  it("does quick maths", async () => {
+    expect((await runCommand("what is 25 times 4", ctx)).say).toBe("That's 100.");
+    expect((await runCommand("15 percent of 2400", ctx)).say).toBe("That's 360.");
+  });
+
+  it("opens the web for searches and YouTube", async () => {
+    expect((await runCommand("play lofi beats on youtube", ctx)).link?.url).toContain("youtube.com/results?search_query=lofi%20beats");
+    expect((await runCommand("google best CRM for agencies", ctx)).link?.url).toContain("google.com/search?q=best%20CRM");
+    expect((await runCommand("open gmail", ctx)).link?.url).toBe("https://mail.google.com");
+  });
+
+  it("reports today's revenue and the earning skills", async () => {
+    mockApi({
+      "/dashboard": {
+        revenue: { month_inr: 25000, total_inr: 40000, profit_month_inr: 20000, today_inr: 1500,
+          earning_skills: [{ slug: "s", name: "Website Seller", revenue_inr: 25000, revenue_today_inr: 1500 }] },
+      },
+    });
+    const out = await runCommand("how much did we earn today", ctx);
+    expect(out.say).toContain("Today you've earned ₹1,500");
+    expect(out.say).toContain("Website Seller with ₹25,000");
   });
 });
 

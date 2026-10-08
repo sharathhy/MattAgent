@@ -99,7 +99,10 @@ describe("authentication", () => {
 });
 
 const DASHBOARD = {
-  revenue: { truth: "fact", month_inr: 25000, total_inr: 25000, expenses_month_inr: 5000, profit_month_inr: 20000, entries: 2 },
+  revenue: {
+    truth: "fact", month_inr: 25000, total_inr: 25000, expenses_month_inr: 5000, profit_month_inr: 20000, entries: 2,
+    today_inr: 1500, earning_skills: [{ slug: "web-seller", name: "Website Redesign Seller", revenue_inr: 25000, revenue_today_inr: 1500 }],
+  },
   tasks: { by_status: { succeeded: 3, failed: 1 }, active: 2, recent: [
     { id: 7, objective: "Find gyms in Mysore", status: "running", agent: null, kind: "workflow", created_at: "2026-10-08T00:00:00Z" },
   ] },
@@ -127,7 +130,10 @@ describe("command center", () => {
     expect(screen.getByText("Pipeline").parentElement).toHaveTextContent(/Assumption/);
     expect(screen.getByText("AI Cost Today").parentElement).toHaveTextContent("No AI model key set");
     expect(screen.getByText("Find gyms in Mysore")).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText(/System ok/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Core ok/)).toBeInTheDocument());
+    // HUD revenue panel: today's money and the skills earning it.
+    expect(screen.getByLabelText("Revenue today")).toHaveTextContent("₹1,500");
+    expect(screen.getByText("Website Redesign Seller")).toBeInTheDocument();
   });
 });
 

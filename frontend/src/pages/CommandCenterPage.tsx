@@ -2,37 +2,56 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 
 import { api } from "../api/client";
-import { BrainConsole } from "../components/BrainConsole";
+import { BootSequence } from "../components/hud/BootSequence";
+import { BrainCore } from "../components/hud/BrainCore";
+import { CommsPanel } from "../components/hud/CommsPanel";
+import { EventFeed } from "../components/hud/EventFeed";
+import { HudClock } from "../components/hud/HudClock";
+import { RevenuePanel } from "../components/hud/RevenuePanel";
 import { LiveMetrics } from "../components/LiveMetrics";
 import { ErrorState, Loading, Panel, Stat } from "../components/ui";
 import { VoiceLockPanel } from "../components/VoiceLockPanel";
 import { titleCase } from "../lib/format";
+import { useVoice } from "../voice/VoiceProvider";
 
 export function CommandCenterPage() {
   const summary = useQuery({ queryKey: ["registry-summary"], queryFn: api.registrySummary });
   const health = useQuery({ queryKey: ["health"], queryFn: api.health, refetchInterval: 30_000 });
+  const dash = useQuery({ queryKey: ["dashboard"], queryFn: api.dashboard, refetchInterval: 5000 });
+  const voice = useVoice();
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
+      <BootSequence />
+      <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <div className="label">Autonomous company operating system</div>
-          <h1 className="mt-1 font-mono text-2xl font-bold tracking-[0.25em] text-accent md:text-3xl">
-            MATT COMMAND CENTER
-          </h1>
+          <h1 className="hud-title mt-1 text-xl font-bold md:text-2xl">MATT COMMAND CENTER</h1>
+          <div className="mt-2 flex flex-wrap gap-2 text-xs">
+            <Chip ok={health.data?.status === "ok"} label={`Core ${health.data ? health.data.status : health.isError ? "offline" : "…"}`} />
+            <Chip ok={health.data?.database === "ok"} label={`Database ${health.data?.database ?? "…"}`} />
+            <Chip ok={dash.data?.ai.model_available} label={dash.data ? (dash.data.ai.model_available ? "AI model online" : "No AI model key") : "AI …"} />
+            <Chip ok={!["off", "unsupported", "error", "blocked"].includes(voice.state)} label={`Voice ${voice.state}`} />
+            {dash.data && <Chip ok label={`${dash.data.workforce.agents} agents · ${dash.data.tasks.active} tasks live`} />}
+          </div>
         </div>
-        <div className="panel flex items-center gap-2 px-3 py-2 text-xs">
-          <span
-            className={`h-2 w-2 rounded-full ${health.data?.status === "ok" ? "bg-ok shadow-[0_0_8px_var(--color-ok)]" : "bg-danger"}`}
-            aria-hidden
-          />
-          System {health.data ? health.data.status : health.isError ? "unreachable" : "checking"}
-          {health.data && <span className="text-muted">· DB {health.data.database} · {health.data.env}</span>}
-        </div>
+        <HudClock />
       </header>
 
-      <BrainConsole />
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(260px,320px)_minmax(0,1fr)_minmax(300px,380px)]">
+        <div className="order-3 space-y-5 lg:order-1">
+          <RevenuePanel />
+        </div>
+        <div className="order-1 lg:order-2">
+          <BrainCore />
+        </div>
+        <div className="order-2 space-y-5 lg:order-3">
+          <CommsPanel />
+          <EventFeed />
+        </div>
+      </div>
 
+      <h2 className="label border-t border-line pt-5">Operations</h2>
       <LiveMetrics />
 
       {summary.isPending && <Loading label="Loading workforce" />}
@@ -84,5 +103,17 @@ function BarList({ data, total }: { data: Record<string, number>; total: number 
         </li>
       ))}
     </ul>
+  );
+}
+
+function Chip({ ok, label }: { ok: boolean | undefined; label: string }) {
+  return (
+    <span className="flex items-center gap-1.5 rounded border border-line bg-slate-950/50 px-2 py-0.5 font-mono uppercase tracking-wider text-slate-300">
+      <span
+        className={`h-1.5 w-1.5 rounded-full ${ok ? "bg-ok shadow-[0_0_6px_var(--color-ok)]" : ok === undefined ? "bg-slate-500" : "bg-danger"}`}
+        aria-hidden
+      />
+      {label}
+    </span>
   );
 }

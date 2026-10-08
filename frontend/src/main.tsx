@@ -3,6 +3,11 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 
+import "@fontsource/orbitron/500.css";
+import "@fontsource/orbitron/700.css";
+import "@fontsource/rajdhani/500.css";
+import "@fontsource/rajdhani/600.css";
+
 import { App } from "./App";
 import "./index.css";
 import { AuthProvider } from "./lib/auth";

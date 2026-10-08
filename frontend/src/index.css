@@ -1,46 +1,110 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #05070d;
-  --color-panel: rgb(15 23 42 / 0.55);
-  --color-line: rgb(56 189 248 / 0.18);
+  --color-bg: #02060c;
+  --color-panel: rgb(6 18 30 / 0.62);
+  --color-line: rgb(56 189 248 / 0.22);
   --color-accent: #22d3ee;
   --color-accent-2: #a78bfa;
+  --color-hot: #fb923c;
   --color-ok: #34d399;
   --color-warn: #fbbf24;
   --color-danger: #f87171;
-  --color-muted: #94a3b8;
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --color-muted: #7f9bb3;
+  --font-sans: "Rajdhani", "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-hud: "Orbitron", "Rajdhani", ui-sans-serif, sans-serif;
 }
 
+/* Faint hexagon lattice behind everything, plus a cyan/violet glow. */
 body {
   background:
-    radial-gradient(ellipse at 20% -10%, rgb(34 211 238 / 0.12), transparent 50%),
-    radial-gradient(ellipse at 90% 10%, rgb(167 139 250 / 0.10), transparent 45%),
+    radial-gradient(ellipse at 50% 30%, rgb(34 211 238 / 0.10), transparent 55%),
+    radial-gradient(ellipse at 90% 100%, rgb(167 139 250 / 0.08), transparent 45%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='98' viewBox='0 0 56 98'%3E%3Cpath d='M28 66L0 50V16L28 0l28 16v34L28 66zm0 32L0 82V66l28 16 28-16v16L28 98z' fill='none' stroke='%2322d3ee' stroke-opacity='0.05' stroke-width='1'/%3E%3C/svg%3E"),
     var(--color-bg);
-  color: #e2e8f0;
+  color: #dbeafe;
   min-height: 100vh;
+  font-size: 16px;
+  letter-spacing: 0.01em;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-hud);
+  letter-spacing: 0.06em;
 }
 
 @layer components {
+  /* HUD panel: glass with glowing corner brackets. */
   .panel {
-    @apply rounded-xl border border-line bg-panel backdrop-blur-md shadow-[0_0_0_1px_rgb(34_211_238/0.03),0_8px_30px_rgb(0_0_0/0.35)];
+    @apply relative rounded-lg border border-line bg-panel backdrop-blur-md shadow-[inset_0_0_30px_rgb(34_211_238/0.04),0_10px_40px_rgb(0_0_0/0.45)];
+  }
+  .panel::before,
+  .panel::after {
+    content: "";
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    pointer-events: none;
+    border-color: var(--color-accent);
+    opacity: 0.85;
+  }
+  .panel::before {
+    top: -1px;
+    left: -1px;
+    border-top: 2px solid;
+    border-left: 2px solid;
+    border-top-left-radius: 0.5rem;
+  }
+  .panel::after {
+    right: -1px;
+    bottom: -1px;
+    border-right: 2px solid;
+    border-bottom: 2px solid;
+    border-bottom-right-radius: 0.5rem;
   }
   .label {
-    @apply font-mono text-[11px] uppercase tracking-[0.18em] text-muted;
+    @apply text-[11px] uppercase tracking-[0.22em] text-muted;
+    font-family: var(--font-hud);
+  }
+  .hud-title {
+    font-family: var(--font-hud);
+    @apply uppercase tracking-[0.3em] text-accent;
+    text-shadow: 0 0 12px rgb(34 211 238 / 0.55);
+  }
+  .hud-num {
+    font-family: var(--font-hud);
+    @apply font-bold tabular-nums;
+  }
+  .glow {
+    text-shadow: 0 0 14px currentColor;
   }
   .input {
-    @apply w-full rounded-lg border border-line bg-slate-950/60 px-3 py-2 text-sm outline-none focus:border-accent focus:ring-1 focus:ring-accent;
+    @apply w-full rounded-md border border-line bg-slate-950/70 px-3 py-2 text-base outline-none placeholder:text-slate-500 focus:border-accent focus:ring-1 focus:ring-accent;
   }
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-accent/90 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-accent disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-md border border-accent/60 bg-accent/15 px-4 py-2 text-sm font-semibold uppercase tracking-wider text-accent transition hover:bg-accent/30 hover:shadow-[0_0_18px_rgb(34_211_238/0.35)] disabled:opacity-40;
   }
 }
 
 @keyframes scan {
   from { transform: translateY(-100%); }
   to { transform: translateY(100%); }
+}
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  92% { opacity: 1; }
+  93% { opacity: 0.6; }
+  94% { opacity: 1; }
+}
+@keyframes rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes blink {
+  50% { opacity: 0; }
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -51,5 +115,16 @@ body {
     background: linear-gradient(to bottom, transparent, rgb(34 211 238 / 0.06), transparent);
     animation: scan 6s linear infinite;
     pointer-events: none;
+  }
+  .flicker {
+    animation: flicker 5s infinite;
+  }
+  .rise {
+    animation: rise 0.5s ease-out both;
+  }
+  .caret::after {
+    content: "▋";
+    margin-left: 2px;
+    animation: blink 1s steps(1) infinite;
   }
 }

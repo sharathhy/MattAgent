@@ -2,6 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { api } from "../api/client";
 import { useAuth } from "../lib/auth";
 import { runCommand } from "./commands";
 import { startMic, type MicMonitor } from "./mic";
@@ -18,12 +19,22 @@ import { detectWake } from "./wake";
  * `idle` means the browser needs a tap before it will open the mic; `blocked` means the
  * mic permission was refused; `off` means the owner muted the always-on mic.
  */
-export type VoiceState = "unsupported" | "idle" | "blocked" | "off" | "sleeping" | "awake" | "thinking" | "speaking";
+export type VoiceState =
+  | "unsupported"
+  | "idle"
+  | "blocked"
+  | "error"
+  | "off"
+  | "sleeping"
+  | "awake"
+  | "thinking"
+  | "speaking";
 
 export interface LogEntry {
   id: number;
   who: "you" | "matt" | "system";
   text: string;
+  link?: { label: string; url: string };
 }
 
 /** Live signals the brain animation samples every frame (no React re-render). */
@@ -36,6 +47,8 @@ interface VoiceApi {
   state: VoiceState;
   interim: string;
   log: LogEntry[];
+  /** Why voice isn't working, in plain words, when it isn't. */
+  problem: string | null;
   recognitionSupported: boolean;
   signals: BrainSignals;
   voiceprint: Voiceprint | null;
@@ -56,6 +69,18 @@ const VoiceContext = createContext<VoiceApi | null>(null);
 const ENABLED_KEY = "matt.voice.enabled";
 const AWAKE_TIMEOUT_MS = 12_000;
 const LOCK_WINDOW_MS = 3_500;
+/**
+ * Phones give the microphone to one user at a time: a level meter would starve speech
+ * recognition there, so on mobile only recognition opens the mic.
+ */
+const MOBILE = typeof navigator !== "undefined" && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+
+const ERROR_TEXT: Record<string, string> = {
+  network:
+    "This browser can't reach its speech service. Brave and some Chromium browsers block it; use Chrome, Edge or Safari, or type below.",
+  "audio-capture": "No microphone was found. Plug one in or check your system sound settings.",
+  "service-not-allowed": "This browser doesn't allow speech recognition here. Use Chrome, Edge or Safari, or type below.",
+};
 
 const readEnabled = () => {
   try {
@@ -76,6 +101,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   const [state, setStateRaw] = useState<VoiceState>(() => (Ctor ? (readEnabled() ? "idle" : "off") : "unsupported"));
   const [interim, setInterim] = useState("");
   const [log, setLog] = useState<LogEntry[]>([]);
+  const [problem, setProblem] = useState<string | null>(null);
   const [voiceprint, setVoiceprint] = useState<Voiceprint | null>(() => (email ? loadVoiceprint(email) : null));
 
   const stateRef = useRef(state);
@@ -89,6 +115,12 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   const lastWord = useRef(0);
   const nextId = useRef(1);
   const warnedBlocked = useRef(false);
+  const failures = useRef(0);
+  const heardAt = useRef(0);
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  /** Background tasks started by voice, announced when they finish. */
+  const pendingTasks = useRef(new Set<number>());
+  const lastEventId = useRef(0);
   const vpRef = useRef(voiceprint);
   const handleFinalRef = useRef<(text: string) => void>(() => {});
 
@@ -97,14 +129,15 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     setStateRaw(s);
   }, []);
 
-  const push = useCallback((who: LogEntry["who"], text: string) => {
+  const push = useCallback((who: LogEntry["who"], text: string, link?: LogEntry["link"]) => {
     const id = nextId.current++;
-    setLog((l) => [...l.slice(-30), { id, who, text }]);
+    setLog((l) => [...l.slice(-30), { id, who, text, link }]);
   }, []);
 
   const signals = useMemo<BrainSignals>(
     () => ({
-      mic: () => micRef.current?.level() ?? 0,
+      // Without a level meter (phones), pulse whenever the recogniser hears words.
+      mic: () => micRef.current?.level() ?? 0.55 * Math.exp(-(performance.now() - heardAt.current) / 350),
       voice: () => {
         if (stateRef.current !== "speaking") return 0;
         const since = performance.now() - lastWord.current;
@@ -131,6 +164,9 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
         restartDelay.current = 250;
       };
       rec.onresult = (e) => {
+        failures.current = 0;
+        heardAt.current = performance.now();
+        setProblem(null);
         let partial = "";
         for (let i = e.resultIndex; i < e.results.length; i++) {
           const r = e.results[i];
@@ -139,11 +175,33 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
           else partial += text;
         }
         setInterim(partial.trim());
+        // Light up as soon as the wake phrase is heard, before the recogniser finalises it.
+        if (stateRef.current === "sleeping" && detectWake(partial)) setState("awake");
       };
       rec.onerror = (e) => {
-        if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+        if (e.error === "no-speech" || e.error === "aborted") return;
+        if (e.error === "not-allowed") {
           wantListening.current = false;
-          setState("blocked");
+          // Without a prior tap some browsers refuse silently; a tap fixes that, a real denial doesn't.
+          const tapped = (navigator as { userActivation?: { hasBeenActive: boolean } }).userActivation?.hasBeenActive;
+          setState(tapped === false ? "idle" : "blocked");
+          return;
+        }
+        if (e.error === "audio-capture" && micRef.current) {
+          // The level meter is holding the mic; give it to recognition instead.
+          micRef.current.stop();
+          micRef.current = null;
+          return;
+        }
+        if (e.error === "language-not-supported") {
+          rec.lang = "en-US";
+          return;
+        }
+        failures.current += 1;
+        if (failures.current >= 3 || e.error === "service-not-allowed") {
+          wantListening.current = false;
+          setProblem(ERROR_TEXT[e.error] ?? `Speech recognition failed (${e.error}). Type below instead.`);
+          setState("error");
         }
       };
       rec.onend = () => {
@@ -171,8 +229,10 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 
   const begin = useCallback(async () => {
     if (!Ctor) return;
+    setProblem(null);
+    failures.current = 0;
     try {
-      await getMic();
+      if (!MOBILE) await getMic();
     } catch (err) {
       const denied = err instanceof DOMException && (err.name === "NotAllowedError" || err.name === "SecurityError");
       if (denied) {
@@ -183,7 +243,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     }
     wantListening.current = true;
     pausedForSpeech.current = false;
-    if (stateRef.current === "idle" || stateRef.current === "blocked" || stateRef.current === "off") setState("sleeping");
+    if (["idle", "blocked", "off", "error"].includes(stateRef.current)) setState("sleeping");
     startRecognition();
   }, [Ctor, getMic, setState, startRecognition]);
 
@@ -242,7 +302,24 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
         clearTimeout(slow);
       }
       if (outcome.navigate) navigate(outcome.navigate);
-      push("matt", outcome.say);
+      push("matt", outcome.say, outcome.link);
+      if (outcome.link) {
+        // Works when the command was typed or tapped; voice-only commands get the link in the log.
+        window.open(outcome.link.url, "_blank", "noopener");
+      }
+      if (outcome.taskId !== undefined) pendingTasks.current.add(outcome.taskId);
+      if (outcome.timer) {
+        const { ms, label } = outcome.timer;
+        timers.current.push(
+          setTimeout(() => {
+            const text = label ? `Reminder: ${label}.` : "Your timer is done.";
+            push("matt", text);
+            void say(text).then(() => {
+              if (stateRef.current === "speaking") setState(wantListening.current ? "sleeping" : "idle");
+            });
+          }, ms),
+        );
+      }
       await say(outcome.say);
       if (outcome.logout) {
         wantListening.current = false;
@@ -270,7 +347,9 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       if (!text || enrolling.current || s === "thinking" || s === "speaking") return;
       const wake = detectWake(text);
       if (s === "sleeping" && !wake) return;
-      if (!voiceAccepted(vpRef.current, micRef.current?.recentProfile(LOCK_WINDOW_MS) ?? null)) {
+      // The lock needs the level meter's spectrum; where there is none (phones) it can't judge, so it steps aside.
+      const sample = micRef.current ? micRef.current.recentProfile(LOCK_WINDOW_MS) : null;
+      if (micRef.current && !voiceAccepted(vpRef.current, sample)) {
         push("system", `Ignored "${text}": voice didn't match the enrolled owner.`);
         return;
       }
@@ -279,6 +358,35 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       else void greet();
     };
   }, [execute, greet, push]);
+
+  // Like Alexa telling you the oven timer is done: report back when work started by voice finishes.
+  useEffect(() => {
+    const tick = setInterval(async () => {
+      if (pendingTasks.current.size === 0) return;
+      try {
+        const batch = await api.events(lastEventId.current);
+        for (const e of batch) {
+          lastEventId.current = Math.max(lastEventId.current, e.id);
+          const id = e.payload.task_id as number | undefined;
+          if (id === undefined || !pendingTasks.current.has(id)) continue;
+          if (e.type !== "task.succeeded" && e.type !== "task.failed") continue;
+          pendingTasks.current.delete(id);
+          const detail = String(e.payload.summary ?? e.payload.error ?? "").split("\n")[0]?.slice(0, 220) ?? "";
+          const text = e.type === "task.succeeded" ? `Task done. ${detail}` : `That task failed: ${detail}`;
+          push("matt", text);
+          if (stateRef.current === "sleeping" || stateRef.current === "idle" || stateRef.current === "off") {
+            const before = stateRef.current;
+            void say(text).then(() => {
+              if (stateRef.current === "speaking") setState(wantListening.current ? "sleeping" : before);
+            });
+          }
+        }
+      } catch {
+        /* offline for a moment; try again next tick */
+      }
+    }, 4000);
+    return () => clearInterval(tick);
+  }, [push, say, setState]);
 
   // Always-on: open the mic as soon as the owner is signed in.
   useEffect(() => {
@@ -290,6 +398,11 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   // If the browser needs a gesture first (or speech was blocked), the first tap anywhere starts it.
   useEffect(() => {
     const onGesture = () => {
+      micRef.current?.resume();
+      if (!warnedBlocked.current && "speechSynthesis" in window) {
+        // Unlock spoken replies: browsers only allow speech after the first tap.
+        window.speechSynthesis.speak(new SpeechSynthesisUtterance(""));
+      }
       if (stateRef.current === "idle") void begin();
     };
     window.addEventListener("pointerdown", onGesture);
@@ -313,6 +426,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     () => () => {
       wantListening.current = false;
       clearTimeout(awakeTimer.current);
+      timers.current.forEach(clearTimeout);
       recRef.current?.abort();
       micRef.current?.stop();
       micRef.current = null;
@@ -355,6 +469,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       state,
       interim,
       log,
+      problem,
       recognitionSupported: Ctor !== null,
       signals,
       voiceprint,
@@ -373,7 +488,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       },
       getMic,
     }),
-    [state, interim, log, Ctor, signals, voiceprint, begin, setEnabled, greet, execute, refreshVoiceprint, getMic],
+    [state, interim, log, problem, Ctor, signals, voiceprint, begin, setEnabled, greet, execute, refreshVoiceprint, getMic],
   );
 
   return <VoiceContext.Provider value={value}>{children}</VoiceContext.Provider>;
@@ -389,6 +504,7 @@ export const STATE_LABEL: Record<VoiceState, string> = {
   unsupported: "Voice needs Chrome, Edge or Safari · type below",
   idle: "Tap anywhere to open the microphone",
   blocked: "Microphone blocked · allow it in the address bar",
+  error: "Voice unavailable in this browser · type below",
   off: "Microphone muted",
   sleeping: "Listening for “Hey Matt”",
   awake: "Listening…",

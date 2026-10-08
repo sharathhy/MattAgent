@@ -298,6 +298,10 @@ export interface Dashboard {
     expenses_month_inr: number;
     profit_month_inr: number;
     entries: number;
+    /** Revenue recorded today. Optional until every backend version reports it. */
+    today_inr?: number;
+    /** Skills that have earned money, highest first. */
+    earning_skills?: { slug: string; name: string; revenue_inr: number; revenue_today_inr: number }[];
   };
   tasks: {
     by_status: Record<string, number>;

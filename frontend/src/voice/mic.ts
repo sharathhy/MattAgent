@@ -14,6 +14,8 @@ export interface MicMonitor {
   level(): number;
   /** Mean voiced spectrum over the last `ms` milliseconds, or null if too little speech. */
   recentProfile(ms: number): number[] | null;
+  /** Browsers start audio suspended until a tap. */
+  resume(): void;
   stop(): void;
 }
 
@@ -90,6 +92,9 @@ export async function startMic(): Promise<MicMonitor> {
       const since = performance.now() - ms;
       const frames = history.filter((h) => h.t >= since).map((h) => h.p);
       return frames.length >= 8 ? averageProfiles(frames) : null;
+    },
+    resume() {
+      if (ctx.state === "suspended") void ctx.resume().catch(() => {});
     },
     stop() {
       stopped = true;

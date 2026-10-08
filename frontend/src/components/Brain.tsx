@@ -23,6 +23,7 @@ const PALETTES: Record<VoiceState, Palette> = {
   idle: { node: [56, 189, 248], pulse: [125, 211, 252], energy: 0.3, spin: 0.08, pulses: 4 },
   off: { node: [100, 116, 139], pulse: [148, 163, 184], energy: 0.15, spin: 0.04, pulses: 1 },
   blocked: { node: [248, 113, 113], pulse: [251, 146, 60], energy: 0.3, spin: 0.05, pulses: 3 },
+  error: { node: [248, 113, 113], pulse: [251, 146, 60], energy: 0.3, spin: 0.05, pulses: 3 },
   sleeping: { node: [34, 211, 238], pulse: [125, 211, 252], energy: 0.5, spin: 0.12, pulses: 10 },
   awake: { node: [103, 232, 249], pulse: [255, 255, 255], energy: 0.9, spin: 0.22, pulses: 24 },
   thinking: { node: [167, 139, 250], pulse: [244, 114, 182], energy: 1, spin: 0.9, pulses: 60 },
@@ -129,7 +130,7 @@ export function Brain({ state, signals, size = 420, compact = false }: {
     const { pts, edges } = buildMesh(compact ? 160 : 380);
     const projected = pts.map(() => ({ x: 0, y: 0, z: 0, s: 1 }));
     const pulses: { e: number; t: number; v: number }[] = [];
-    const wave = new Array<number>(96).fill(0);
+    const wave = new Array<number>(120).fill(0);
     let cur = { ...PALETTES[stateRef.current] };
     let rot = 0;
     let level = 0;
@@ -157,7 +158,7 @@ export function Brain({ state, signals, size = 420, compact = false }: {
       const W = size;
       const cx = W / 2;
       const cy = W / 2;
-      const R = W * (compact ? 0.3 : 0.27) * (1 + level * 0.08 + Math.sin(t * 1.6) * 0.012 * cur.energy);
+      const R = W * (compact ? 0.3 : 0.215) * (1 + level * 0.08 + Math.sin(t * 1.6) * 0.012 * cur.energy);
       ctx.clearRect(0, 0, W, W);
 
       // Core glow.
@@ -242,53 +243,7 @@ export function Brain({ state, signals, size = 420, compact = false }: {
       ctx.globalCompositeOperation = "source-over";
 
       if (!compact) {
-        // HUD rings.
-        const rings = [
-          { r: R * 1.55, w: 1, dash: [2, 6], speed: 0.15 },
-          { r: R * 1.7, w: 2, dash: [40, 14, 6, 14], speed: -0.25 * (1 + cur.energy) },
-          { r: R * 1.85, w: 1, dash: [1, 3], speed: 0.08 },
-        ];
-        for (const ring of rings) {
-          ctx.save();
-          ctx.translate(cx, cy);
-          ctx.rotate(t * ring.speed * motion);
-          ctx.setLineDash(ring.dash);
-          ctx.strokeStyle = rgba(cur.node, 0.25 + 0.25 * cur.energy);
-          ctx.lineWidth = ring.w;
-          ctx.beginPath();
-          ctx.arc(0, 0, ring.r, 0, Math.PI * 2);
-          ctx.stroke();
-          ctx.restore();
-        }
-        ctx.setLineDash([]);
-        // Scanning arc while thinking.
-        if (stateRef.current === "thinking") {
-          ctx.strokeStyle = rgba(cur.pulse, 0.8);
-          ctx.lineWidth = 3;
-          ctx.beginPath();
-          const a0 = t * 4;
-          ctx.arc(cx, cy, R * 1.7, a0, a0 + 0.9);
-          ctx.stroke();
-        }
-        // Voice waveform ring.
-        for (let i = 0; i < wave.length; i++) {
-          const n = Math.sin(t * 7 + i * 0.7) * 0.5 + Math.sin(t * 13 + i * 1.9) * 0.5;
-          const amp = level * (0.5 + 0.5 * Math.abs(n));
-          wave[i] = wave[i]! + (amp - wave[i]!) * 0.35;
-        }
-        ctx.strokeStyle = rgba(cur.pulse, Math.min(0.9, 0.08 + level * 1.6));
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        for (let i = 0; i <= wave.length; i++) {
-          const idx = i % wave.length;
-          const ang = (idx / wave.length) * Math.PI * 2 - Math.PI / 2;
-          const rr = R * 1.32 + wave[idx]! * R * 0.35;
-          const x = cx + Math.cos(ang) * rr;
-          const y = cy + Math.sin(ang) * rr;
-          if (i === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
-        }
-        ctx.stroke();
+        drawReactor(ctx, cx, cy, R, t * motion, cur, level, stateRef.current, wave);
       }
 
       raf = requestAnimationFrame(draw);
@@ -306,4 +261,98 @@ export function Brain({ state, signals, size = 420, compact = false }: {
       className="block aspect-square h-auto"
     />
   );
+}
+
+const HOT = [251, 146, 60];
+
+/** Arc-reactor HUD around the brain: tick ring, segmented rings, hot arcs and a voice spectrum. */
+function drawReactor(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  R: number,
+  t: number,
+  cur: Palette,
+  level: number,
+  state: VoiceState,
+  wave: number[],
+) {
+  const arc = (r: number, a0: number, a1: number, color: string, w: number) => {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = w;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, a0, a1);
+    ctx.stroke();
+  };
+  const base = 0.3 + 0.35 * cur.energy;
+
+  // Inner halo.
+  arc(R * 1.14, 0, Math.PI * 2, rgba(cur.node, 0.12 + level * 0.3), 1);
+
+  // Voice spectrum: radial bars that jump with the mic or MATT's speech.
+  for (let i = 0; i < wave.length; i++) {
+    const n = Math.sin(t * 7 + i * 0.7) * 0.5 + Math.sin(t * 13 + i * 1.9) * 0.5;
+    const amp = 0.04 * cur.energy + level * (0.45 + 0.55 * Math.abs(n));
+    wave[i] = wave[i]! + (amp - wave[i]!) * 0.3;
+  }
+  ctx.lineWidth = 2;
+  ctx.lineCap = "round";
+  for (let i = 0; i < wave.length; i++) {
+    const ang = (i / wave.length) * Math.PI * 2 - Math.PI / 2;
+    const r0 = R * 1.22;
+    const r1 = r0 + 2 + wave[i]! * R * 0.32;
+    ctx.strokeStyle = rgba(i % 2 ? cur.node : cur.pulse, 0.25 + Math.min(0.7, wave[i]! * 2));
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(ang) * r0, cy + Math.sin(ang) * r0);
+    ctx.lineTo(cx + Math.cos(ang) * r1, cy + Math.sin(ang) * r1);
+    ctx.stroke();
+  }
+  ctx.lineCap = "butt";
+
+  // Tick ring like a dial, slowly turning.
+  const ticks = 120;
+  const tr = R * 1.62;
+  const rot = t * 0.05;
+  for (let i = 0; i < ticks; i++) {
+    const ang = (i / ticks) * Math.PI * 2 + rot;
+    const long = i % 10 === 0;
+    const len = long ? 9 : 4;
+    ctx.strokeStyle = rgba(cur.node, long ? base + 0.2 : base * 0.6);
+    ctx.lineWidth = long ? 1.6 : 1;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(ang) * tr, cy + Math.sin(ang) * tr);
+    ctx.lineTo(cx + Math.cos(ang) * (tr + len), cy + Math.sin(ang) * (tr + len));
+    ctx.stroke();
+  }
+
+  // Segmented thick ring, counter-rotating, faster when busy.
+  const seg = R * 1.78;
+  const spinA = -t * (0.2 + 0.5 * cur.energy);
+  for (let k = 0; k < 3; k++) {
+    const a0 = spinA + (k * Math.PI * 2) / 3;
+    arc(seg, a0, a0 + 1.6, rgba(cur.node, base + 0.15), 4);
+    arc(seg, a0 + 1.72, a0 + 1.86, rgba(cur.node, base), 4);
+  }
+
+  // Hot (orange) accent arcs, the signature JARVIS touch.
+  const hot = R * 1.92;
+  const spinB = t * 0.35;
+  arc(hot, spinB, spinB + 0.55, rgba(HOT, 0.75), 2.5);
+  arc(hot, spinB + Math.PI, spinB + Math.PI + 0.3, rgba(HOT, 0.55), 2.5);
+  arc(R * 1.5, -spinB * 1.4, -spinB * 1.4 + 0.25, rgba(HOT, 0.5), 1.5);
+
+  // Outer hairline with gaps.
+  ctx.setLineDash([2, 8]);
+  arc(R * 2.02, 0, Math.PI * 2, rgba(cur.node, 0.25), 1);
+  ctx.setLineDash([]);
+
+  // Thinking: a scanner sweeping the segmented ring.
+  if (state === "thinking") {
+    const a0 = t * 5;
+    arc(seg, a0, a0 + 0.9, rgba(cur.pulse, 0.9), 6);
+  }
+  // Awake: a bright full ring pulse, so you can see MATT is listening for your command.
+  if (state === "awake") {
+    arc(R * 1.5, 0, Math.PI * 2, rgba(cur.pulse, 0.25 + 0.2 * Math.sin(t * 6)), 2);
+  }
 }

@@ -2,9 +2,10 @@
  * Wake-phrase detection on recogniser transcripts. Recognisers often mishear "Matt"
  * ("mat", "mad", "math", "max"), so a small set of near-misses is accepted.
  */
-const GREETING = "(?:hey|hi|hello|ok|okay|a|yo)";
-const NAME = "(?:matt|mat|matte|mad|math|mass|max|met|maat)";
-const WAKE = new RegExp(`\\b${GREETING}[\\s,.!]+${NAME}\\b[\\s,.!?]*`, "i");
+const GREETING = "(?:hey|hay|hi|hello|ok|okay|a|yo)";
+const NAME = "(?:matt|mat|matte|mad|math|mass|max|met|maat|mutt|mac|mart)";
+/** "Hey Matt" anywhere, or just "Matt, …" at the start, the way people talk to Alexa. */
+const WAKE = new RegExp(`(?:\\b${GREETING}[\\s,.!]+${NAME}\\b|^\\s*(?:matt|mat)\\b)[\\s,.!?]*`, "i");
 
 export interface WakeMatch {
   /** Whatever was said after the wake phrase, e.g. "show me the agents". */
